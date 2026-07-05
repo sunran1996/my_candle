@@ -657,7 +657,7 @@ def run_backtest(start_date_str, dca=0):
         v20_val = hs300.get('vol20', np.nan) if hs300 is not None else np.nan
         ret_val = hs300.get('ret', np.nan) if hs300 is not None else np.nan
         if not np.isnan(v20_val) and len(vol_history) > 252:
-            p99 = np.percentile(vol_history, 99)
+            p99 = np.percentile(vol_history, 99.9)
             if v20_val > p99 and not np.isnan(ret_val):
                 if ret_val < -0.03:       layer_sz *= 1.3   # 暴跌3%+: 逆势加仓
                 elif ret_val > 0.03:      layer_sz *= 0.7   # 暴涨3%+: 锁定利润
