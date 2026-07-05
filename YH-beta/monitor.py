@@ -596,6 +596,7 @@ def run_backtest(start_date_str, dca=0):
     peak_nav = INITIAL_CAPITAL
     trade_log = []
     nav_log = []
+    vol_history = []  # 沪深300 vol20 历史, 用于99%分位检测
 
     # 逐日模拟
     print(f"\n[2] 逐日模拟...")
@@ -639,7 +640,7 @@ def run_backtest(start_date_str, dca=0):
         profit_mult = calc_profit_multiplier(nav, total_invested)
         layer_sz *= profit_mult
 
-        # 极端波动过滤器: 只在回撤+高波时激活, 正常行情不干预
+        # 极端波动过滤器: 固定阈值 + 99%分位检测
         vol_r = rows.get('沪深300', {}).get('vol_ma60', np.nan)
         if not np.isnan(vol_r) and vol_r > 0 and dd < -0.05:
             vol20 = rows['沪深300'].get('vol20', np.nan)
@@ -650,6 +651,16 @@ def run_backtest(start_date_str, dca=0):
                 elif vol_ratio > 1.5:     vol_adj = 0.9
                 else:                     vol_adj = 1.0
                 layer_sz *= vol_adj
+
+        # 99%极端行情逆向操作: 暴跌加仓, 暴涨减仓
+        hs300 = rows.get('沪深300')
+        v20_val = hs300.get('vol20', np.nan) if hs300 is not None else np.nan
+        ret_val = hs300.get('ret', np.nan) if hs300 is not None else np.nan
+        if not np.isnan(v20_val) and len(vol_history) > 252:
+            p99 = np.percentile(vol_history, 99)
+            if v20_val > p99 and not np.isnan(ret_val):
+                if ret_val < -0.03:       layer_sz *= 1.3   # 暴跌3%+: 逆势加仓
+                elif ret_val > 0.03:      layer_sz *= 0.7   # 暴涨3%+: 锁定利润
 
         target = allocate(scores, dd)
 
@@ -752,6 +763,11 @@ def run_backtest(start_date_str, dca=0):
 
         cash = remaining_cash
         nav_log.append({'date': d, 'nav': nav, 'holdings': holdings, 'dd': dd})
+        # 记录波动率历史(500日滑动窗口)
+        if not np.isnan(v20_val):
+            vol_history.append(v20_val)
+            if len(vol_history) > 500:
+                vol_history.pop(0)
 
     # 最终结果(仅统计最后交易日有数据的品种)
     last_rows = {}
