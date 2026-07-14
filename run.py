@@ -7,13 +7,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-r', '--reset', action='store_true', help='清空持仓')
 args = parser.parse_args()
 if args.reset:
-    for f in ['YH-beta5/positions.json']:
+    for f in ['YH01/positions.json']:
         try: os.remove(f); print(f'cleared: {f}')
         except: pass
     sys.exit(0)
 
 out_file = 'd:\\策略\\_beta5_out.txt'
-subprocess.run([sys.executable, 'YH-beta5/monitor.py', '--output', out_file])
+subprocess.run([sys.executable, 'YH01/monitor.py', '--output', out_file])
 with open(out_file, 'r', encoding='utf-8') as f: out = f.read()
 
 signals = []
