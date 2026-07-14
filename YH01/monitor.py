@@ -45,7 +45,7 @@ def run_backtest(start_date_str):
     cash = 0.0; total_invested = INITIAL_CAPITAL; reserve_pool = RESERVE; reserve_active = False; reserve_shares = 0.0
     shares = INITIAL_CAPITAL / df['close'].iloc[0] * (1 - COMMISSION - SLIPPAGE)
     peak_nav = INITIAL_CAPITAL; nav = INITIAL_CAPITAL
-    trades = []; nav_log = []; prev_price = None; last_month = None; dca = 20000
+    trades = []; missed = []; nav_log = []; prev_price = None; last_month = None; dca = 20000
 
     for i, row in df.iterrows():
         price = row['close']; d = row['date']; adj = row['adj_close']
@@ -69,20 +69,26 @@ def run_backtest(start_date_str):
         sell_sig = (bb_sell and rsi_sell) if SELL_MODE == 'AND' else (bb_sell or rsi_sell)
 
         action = None
-        if buy_sig and cash > nav * 0.1:
-            buy_shares = cash / price * (1 - COMMISSION - SLIPPAGE)
-            if reserve_active:
-                reserve_shares += buy_shares * (RESERVE / (INITIAL_CAPITAL + RESERVE))
-                shares += buy_shares - buy_shares * (RESERVE / (INITIAL_CAPITAL + RESERVE))
+        if buy_sig:
+            if cash > nav * 0.01:  # 有闲钱就投, 包括DCA月供
+                buy_shares = cash / price * (1 - COMMISSION - SLIPPAGE)
+                if reserve_active:
+                    reserve_shares += buy_shares * (RESERVE / (INITIAL_CAPITAL + RESERVE))
+                    shares += buy_shares - buy_shares * (RESERVE / (INITIAL_CAPITAL + RESERVE))
+                else:
+                    shares += buy_shares
+                cash = 0; action = 'BUY'
             else:
-                shares += buy_shares
-            cash = 0; action = 'BUY'
-        elif sell_sig and (shares > 0 or reserve_shares > 0):
-            cash += (shares + reserve_shares) * price * (1 - COMMISSION - SLIPPAGE)
-            if reserve_active:
-                reserve_pool = reserve_shares * price * (1 - COMMISSION - SLIPPAGE)
-                cash -= reserve_pool; reserve_shares = 0; reserve_active = False
-            shares = 0; action = 'SELL'
+                missed.append({'date': d, 'type': 'buy'})
+        elif sell_sig:
+            if shares > 0 or reserve_shares > 0:
+                cash += (shares + reserve_shares) * price * (1 - COMMISSION - SLIPPAGE)
+                if reserve_active:
+                    reserve_pool = reserve_shares * price * (1 - COMMISSION - SLIPPAGE)
+                    cash -= reserve_pool; reserve_shares = 0; reserve_active = False
+                shares = 0; action = 'SELL'
+            else:
+                missed.append({'date': d, 'type': 'sell'})
         if action:
             nav = cash + (shares + reserve_shares) * price
             trades.append({'日期': d.strftime('%Y-%m-%d'), '方向': action, '价格': round(price, 4),
@@ -127,6 +133,12 @@ def run_backtest(start_date_str):
             bd['adj'] = bd['日期'].map(pm); sd['adj'] = sd['日期'].map(pm)
             if len(bd) > 0: ax.scatter(pd.to_datetime(bd['日期']), bd['adj'], color='#c0392b', s=40, marker='^', zorder=5, label='Buy')
             if len(sd) > 0: ax.scatter(pd.to_datetime(sd['日期']), sd['adj'], color='#27ae60', s=40, marker='v', zorder=5, label='Sell')
+        if missed:
+            md = pd.DataFrame(missed); md['date'] = pd.to_datetime(md['date'])
+            mb = md[md['type']=='buy']; ms = md[md['type']=='sell']
+            mb['adj'] = mb['date'].dt.strftime('%Y-%m-%d').map(pm); ms['adj'] = ms['date'].dt.strftime('%Y-%m-%d').map(pm)
+            if len(mb) > 0: ax.scatter(mb['date'], mb['adj'], color='#e74c3c', s=20, marker='^', alpha=0.35, zorder=4, label='Buy(missed)')
+            if len(ms) > 0: ax.scatter(ms['date'], ms['adj'], color='#2ecc71', s=20, marker='v', alpha=0.35, zorder=4, label='Sell(missed)')
         ax.set_ylabel('Price'); ax.legend(fontsize=8, loc='upper left', ncol=2); ax.grid(True, alpha=0.3)
         ax = axes[1]
         ax.plot(nav_df['date'], nav_df['nav']/INITIAL_CAPITAL, color='#e74c3c', lw=2.5, label='BB+RSI')
