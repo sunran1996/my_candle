@@ -19,42 +19,7 @@ plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = [CN_SANS, 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
-import re
-
-def mixed_text(ax, x, y, text, cn_family=None, en_family='Times New Roman',
-               fontsize=10, color='black', fontweight='normal', ha='left', va='baseline'):
-    """中英文混排: 中文用cn_family, 英文数字用Times New Roman, 自动拼接"""
-    if cn_family is None:
-        cn_family = CN_SANS
-    # 拆分: CJK字符 vs 非CJK
-    tokens = re.split(r'([一-鿿　-〿＀-￯]+)', text)
-    # 计算总宽度
-    renderer = ax.figure.canvas.get_renderer() if hasattr(ax.figure.canvas, 'get_renderer') else None
-    segments = []
-    total_w = 0
-    for tok in tokens:
-        if not tok: continue
-        is_cn = bool(re.match(r'[一-鿿]', tok))
-        fam = cn_family if is_cn else en_family
-        t = ax.text(0, 0, tok, fontsize=fontsize, family=fam, fontweight=fontweight, alpha=0)
-        bbox = t.get_window_extent(renderer)
-        w = bbox.width / ax.figure.dpi * 72  # pixels -> points
-        t.remove()
-        segments.append((tok, fam, w))
-        total_w += w
-    # 按对齐方式确定起始x
-    if ha == 'right':
-        start_x = x - total_w
-    elif ha == 'center':
-        start_x = x - total_w / 2
-    else:
-        start_x = x
-    # 逐段渲染
-    cx = start_x
-    for tok, fam, w in segments:
-        ax.text(cx, y, tok, fontsize=fontsize, color=color, fontweight=fontweight,
-                family=fam, ha='left', va=va)
-        cx += w
+# 字体方案: 标题/操作建议用黑体(sans-serif), 信息区用SimSun(自带衬线英文≈Times New Roman)
 
 ETF_SYMBOL = 'sh512890'; ETF_NAME = '红利低波'
 BB_PERIOD = 45; BB_STD = 2.0
@@ -148,8 +113,8 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
     # 标题 + 日期 (黑体)
-    mixed_text(ax, 0.3, 9.0, f'{ETF_NAME}({ETF_SYMBOL.upper()})',
-               cn_family=CN_SANS, fontsize=20, fontweight='bold', color=fg)
+    # 标题
+    ax.text(0.3, 9.0, f'{ETF_NAME}({ETF_SYMBOL.upper()})', fontsize=20, fontweight='bold', color=fg)
     ax.text(0.3, 8.2, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
 
     # 价格: 红涨绿跌 + 涨跌幅
@@ -217,7 +182,6 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
 
     # 标题行
     ax.text(0, len(monthly)+1, '月度收益看板', fontsize=12, fontweight='bold', color=fg, va='bottom')
-    ax.text(10, len(monthly)+1, '策略 / 持有 / 超额', fontsize=8, color=sub, ha='right', va='bottom')
 
     # 列头
     cols = [2.5, 2.0, 2.5, 3.0]  # 月份, 策略, 持有, 超额
