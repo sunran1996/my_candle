@@ -90,43 +90,49 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     # 月度收益
     monthly = month_returns(df, 12)
 
-    # ===== 浅色主题 =====
+    # ===== 浅色主题 (A股配色: 红涨绿跌) =====
     bg = '#FFFFFF'
     card_bg = '#F8F9FA'
     fg = '#1A1A2E'
     sub = '#6B7280'
-    green = '#059669'; red = '#DC2626'; blue = '#2563EB'
+    up_c = '#DC2626'; down_c = '#16A34A'  # 中国: 红涨绿跌
     border = '#E5E7EB'
 
-    if sig == '买入': accent_c = green; accent_bg = '#ECFDF5'
-    elif sig == '卖出': accent_c = red; accent_bg = '#FEF2F2'
+    if sig == '买入': accent_c = up_c; accent_bg = '#FEF2F2'
+    elif sig == '卖出': accent_c = down_c; accent_bg = '#F0FDF4'
     else: accent_c = '#6B7280'; accent_bg = '#F9FAFB'
 
     # 6×10.5 inches, 适配 iPhone
     fig = plt.figure(figsize=(6, 10.5), facecolor=bg)
-    gs = fig.add_gridspec(3, 1, height_ratios=[1.0, 1.8, 3.0], hspace=0.3,
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.3, 1.8, 3.0], hspace=0.3,
                           left=0.06, right=0.94, top=0.98, bottom=0.02)
 
     # ── P1: 信号卡 ──
     ax = fig.add_subplot(gs[0])
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
-    # 信号横条
-    ax.add_patch(plt.Rectangle((0, 2.5), 10, 5, color=accent_bg, zorder=0))
-    ax.add_patch(plt.Circle((1.5, 5), 0.4, color=accent_c, zorder=2))
-    ax.text(2.2, 5, sig, fontsize=30, fontweight='bold', color=accent_c, va='center')
-    ax.text(0.3, 8.8, ETF_NAME, fontsize=13, fontweight='bold', color=fg)
-    ax.text(0.3, 7.6, r['date'].strftime('%Y/%m/%d'), fontsize=11, color=sub)
-    ax.text(9.7, 8.5, f'{price:.3f}', fontsize=22, fontweight='bold', color=fg, ha='right')
-    ax.text(9.7, 7.3, f'RSI {rsi:.0f}  |  BB {bb_pos:.0f}%', fontsize=10, color=sub, ha='right')
-    ax.text(0.3, 1.5, f'{trend} · 近{lookback}日 {ret_lookback:+.1f}%', fontsize=10,
-            color=green if ret_lookback>=0 else red)
-    ax.text(9.7, 1.5, f'上轨{upper_acc:+.4f} 价{price_acc:+.4f}', fontsize=8, color=sub, ha='right')
+    # 标题: 红利低波 大字号
+    ax.text(0.3, 9.2, ETF_NAME, fontsize=22, fontweight='bold', color=fg)
+    ax.text(0.3, 8.2, r['date'].strftime('%Y/%m/%d'), fontsize=10, color=sub)
+
+    # 信号: 小字号
+    ax.add_patch(plt.Rectangle((0, 4.5), 10, 3.2, color=accent_bg, zorder=0))
+    ax.add_patch(plt.Circle((1.2, 6.1), 0.3, color=accent_c, zorder=2))
+    ax.text(1.8, 6.1, sig, fontsize=18, fontweight='bold', color=accent_c, va='center')
+    ax.text(3.5, 6.1, f'RSI {rsi:.0f}  BB {bb_pos:.0f}%  {trend}', fontsize=10, color=sub, va='center')
+
+    # 价格 + BB轨道 大字
+    ax.text(9.7, 9.0, f'{price:.3f}', fontsize=26, fontweight='bold', color=fg, ha='right')
+    ax.text(9.7, 8.0, f'上轨 {r["upper"]:.3f}', fontsize=11, color=sub, ha='right')
+    ax.text(9.7, 7.2, f'下轨 {r["lower"]:.3f}', fontsize=11, color=sub, ha='right')
+    ax.text(0.3, 2.5, f'近{lookback}日 {ret_lookback:+.1f}%', fontsize=11,
+            color=up_c if ret_lookback>=0 else down_c, fontweight='bold')
+    ax.text(9.7, 2.5, f'上轨加速{upper_acc:+.4f} 价加速{price_acc:+.4f}', fontsize=8, color=sub, ha='right')
 
     # ── P2: 净值曲线 ──
     ax = fig.add_subplot(gs[1])
     ax.set_facecolor(bg)
-    line_c = green if nvs[-1] >= 1 else red
+    line_c = up_c if nvs[-1] >= 1 else down_c
     ax.fill_between(range(len(nvs)), 1.0, nvs, alpha=0.1, color=line_c)
     ax.plot(range(len(nvs)), nvs, color=line_c, lw=2.0)
     ax.scatter(len(nvs)-1, nvs[-1], color=line_c, s=50, zorder=5)
@@ -181,16 +187,16 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
 
         ax.text(cx[0], y, str(m)[-7:], fontsize=8, color=fg)
         ax.text(cx[1], y, f'{row["ret"]:+.1f}%', fontsize=9,
-                fontweight='bold', color=green if row['ret']>=0 else red)
+                fontweight='bold', color=up_c if row['ret']>=0 else down_c)
         ax.text(cx[2], y, f'{bh_ret:+.1f}%', fontsize=8, color=sub)
-        ax.text(cx[3], y, f'{alpha_v:+.1f}%', fontsize=8, color=green if alpha_v>=0 else red)
+        ax.text(cx[3], y, f'{alpha_v:+.1f}%', fontsize=8, color=up_c if alpha_v>=0 else down_c)
 
         # 右侧色条
         bar_w = 0.3
         if alpha_v > 0:
-            ax.add_patch(plt.Rectangle((9.5, y-row_h/3), bar_w, row_h*2/3, color=green, alpha=0.6))
+            ax.add_patch(plt.Rectangle((9.5, y-row_h/3), bar_w, row_h*2/3, color=up_c, alpha=0.6))
         elif alpha_v < 0:
-            ax.add_patch(plt.Rectangle((9.5, y-row_h/3), bar_w, row_h*2/3, color=red, alpha=0.4))
+            ax.add_patch(plt.Rectangle((9.5, y-row_h/3), bar_w, row_h*2/3, color=down_c, alpha=0.4))
 
     # 边框
     for spine in ax.spines.values(): spine.set_color(border); spine.set_linewidth(0.6)
@@ -209,18 +215,23 @@ def upload_chart(token, img_bytes):
     ctx = ssl._create_unverified_context()
     headers = {'Authorization': 'Bearer ' + token, 'User-Agent': 'YH02-daily'}
 
-    # 上传当日文件
+    # 上传当日文件 (检查是否已存在)
     api = f'https://api.github.com/repos/{REPO}/contents/YH02/{filename}'
+    sha_day = None
+    try:
+        req = ur.Request(api, headers=headers)
+        r = json.loads(ur.urlopen(req, timeout=10, context=ctx).read())
+        sha_day = r.get('sha')
+    except:
+        pass
     body = json.dumps({
         'message': f'daily chart {today}',
         'content': base64.b64encode(img_bytes).decode('ascii'),
         'branch': 'main',
+        **({'sha': sha_day} if sha_day else {})
     }).encode()
-    try:
-        ur.urlopen(ur.Request(api, data=body, headers={**headers, 'Content-Type': 'application/json'}, method='PUT'),
-                   timeout=15, context=ctx)
-    except Exception as e:
-        print(f"  上传新文件失败: {e}")
+    ur.urlopen(ur.Request(api, data=body, headers={**headers, 'Content-Type': 'application/json'}, method='PUT'),
+               timeout=15, context=ctx)
 
     # 同时更新 live_chart.png (覆写, jsDelivr会慢慢刷新)
     api2 = f'https://api.github.com/repos/{REPO}/contents/YH02/live_chart.png'
