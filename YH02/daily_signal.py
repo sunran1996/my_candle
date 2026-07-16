@@ -10,14 +10,11 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 warnings.filterwarnings('ignore')
 
-# 跨平台中文字体
+# 跨平台: 英文 Times New Roman, 中文黑体
 _fonts = [f.name for f in fm.fontManager.ttflist]
-if 'WenQuanYi Zen Hei' in _fonts:
-    plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'DejaVu Sans']
-elif 'SimHei' in _fonts:
-    plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
-else:
-    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+_cn = 'WenQuanYi Zen Hei' if 'WenQuanYi Zen Hei' in _fonts else ('SimHei' if 'SimHei' in _fonts else 'DejaVu Sans')
+plt.rcParams['font.serif'] = ['Times New Roman', _cn, 'DejaVu Serif']
+plt.rcParams['font.family'] = 'serif'
 plt.rcParams['axes.unicode_minus'] = False
 
 ETF_SYMBOL = 'sh512890'; ETF_NAME = '红利低波'
@@ -112,7 +109,7 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
     # 标题 + 日期
-    ax.text(0.3, 9.0, f'{ETF_NAME}({ETF_SYMBOL})', fontsize=20, fontweight='bold', color=fg)
+    ax.text(0.3, 9.0, f'{ETF_NAME}({ETF_SYMBOL.upper()})', fontsize=20, fontweight='bold', color=fg)
     ax.text(0.3, 8.2, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
 
     # 价格: 红涨绿跌 + 涨跌幅
