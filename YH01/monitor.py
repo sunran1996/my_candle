@@ -21,7 +21,8 @@ RSI_PERIOD = 20; RSI_OVERSOLD = 38; RSI_OVERBOUGHT = 68
 EXPAND_THRESHOLD = 1.01   # BB宽度增长>1%视为扩张
 EXPAND_SELL_AND = True     # 扩张时卖点需AND双确认
 EXPAND_RSI_BOOST = 4       # 扩张时RSI卖点提高4点
-POSITION_FILE = 'd:\\策略\\YH01\\positions.json'
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+POSITION_FILE = os.path.join(SCRIPT_DIR, 'positions.json')
 
 def compute_indicators(df):
     ret = df['close'].pct_change().fillna(0); ret[abs(ret) > 0.1] = 0
@@ -125,7 +126,7 @@ def run_backtest(start_date_str):
     print(f"  Return: {total_ret:+.2f}%  Annual: {ann_ret:+.2f}%  Sharpe: {sharpe:.3f}")
     print(f"  MaxDD: {mdd:+.2f}%  Trades: {len(trade_df)}  Final: {final_nav:,.0f}")
 
-    with open('d:\\策略\\YH01\\trades.txt', 'w', encoding='utf-8') as tf:
+    with open(os.path.join(SCRIPT_DIR, 'trades.txt'), 'w', encoding='utf-8') as tf:
         tf.write(f"{'date':<12} {'dir':<6} {'price':<10} {'nav':<12}\n")
         for t in trades:
             tf.write(f"{t['date']:<12} {t['dir']:<6} {t['price']:<10} {t['nav']:<12,.0f}\n")
@@ -162,7 +163,7 @@ def run_backtest(start_date_str):
         ax.legend(fontsize=9, loc='upper left', framealpha=0.9)
         ax.tick_params(labelsize=9, colors='black'); ax.grid(True, alpha=0.2, color='#ecf0f1')
 
-        plt.savefig('d:\\策略\\YH01\\backtest_chart.png', dpi=150, bbox_inches='tight', facecolor='white'); plt.close()
+        plt.savefig(os.path.join(SCRIPT_DIR, 'backtest_chart.png'), dpi=150, bbox_inches='tight', facecolor='white'); plt.close()
 
 def main():
     import argparse, urllib.request, json
@@ -177,9 +178,9 @@ def main():
         # 推图表
         try:
             import urllib.request as ur, ssl, base64
-            chart_file = 'd:\\策略\\YH01\\backtest_chart.png'
+            chart_file = os.path.join(SCRIPT_DIR, 'backtest_chart.png')
             if os.path.exists(chart_file):
-                token = open('d:\\策略\\github_token.txt').read().strip()
+                token = os.environ.get('GITHUB_TOKEN', '') or open(os.path.join(SCRIPT_DIR, '..', 'github_token.txt')).read().strip()
                 with open(chart_file, 'rb') as f: img = base64.b64encode(f.read()).decode('ascii')
                 ctx = ssl._create_unverified_context()
                 api = 'https://api.github.com/repos/sunran1996/my_candle/contents/YH01/backtest_chart.png'
@@ -296,7 +297,7 @@ def main():
         date_title = f'{start_d.year}年{start_d.month}月{start_d.day}日 — {end_d.year}年{end_d.month}月{end_d.day}日'
         fig.suptitle(date_title, fontsize=12, color='black', fontweight='bold', x=0.5, y=0.98, ha='center')
 
-        live_chart = 'd:\\策略\\YH01\\live_chart.png'
+        live_chart = os.path.join(SCRIPT_DIR, 'live_chart.png')
         plt.savefig(live_chart, dpi=150, bbox_inches='tight', facecolor='white'); plt.close()
 
         # 推送
