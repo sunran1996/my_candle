@@ -105,16 +105,16 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     # 6×10.5 inches, 适配 iPhone
     fig = plt.figure(figsize=(6, 10.5), facecolor=bg)
     gs = fig.add_gridspec(3, 1, height_ratios=[1.3, 1.8, 3.0], hspace=0.15,
-                          left=0.06, right=0.94, top=0.96, bottom=0.02)
+                          left=0.06, right=0.94, top=0.90, bottom=0.02)
 
     # ── P1: 信号卡 ──
     ax = fig.add_subplot(gs[0])
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
-    # 标题 + 日期 (靠近顶部)
-    ax.text(0.3, 9.6, f'{ETF_NAME}({ETF_SYMBOL})', fontsize=20, fontweight='bold', color=fg)
-    ax.text(0.3, 8.8, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
-    ax.text(9.7, 9.6, f'{price:.3f}', fontsize=24, fontweight='bold', color=fg, ha='right')
+    # 标题 + 日期
+    ax.text(0.3, 9.0, f'{ETF_NAME}({ETF_SYMBOL})', fontsize=20, fontweight='bold', color=fg)
+    ax.text(0.3, 8.2, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
+    ax.text(9.7, 9.0, f'{price:.3f}', fontsize=24, fontweight='bold', color=fg, ha='right')
 
     # 指标信息 — 英文数值区 + 中文标签区
     info_font = 10
