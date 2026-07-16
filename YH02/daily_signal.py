@@ -128,17 +128,17 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.add_patch(plt.Circle((1.5, 7.25), 0.35, color=accent_c, zorder=2))
     ax.text(2.2, 7.25, sig, fontsize=18, fontweight='bold', color=accent_c, va='center')
 
-    # 指标信息 — 统一字体
+    # 指标信息 — 统一字体 + 统一颜色
     info_font = 10
     info_y = 5.5
-    c1, c2 = 0.5, 6.0  # 两列
-    ax.text(c1, info_y, f'RSI {rsi:.0f}', fontsize=info_font, color=fg)
-    ax.text(c2, info_y, f'BB {bb_pos:.0f}%', fontsize=info_font, color=fg)
-    ax.text(c1, info_y-0.8, f'上轨 {r["upper"]:.3f}', fontsize=info_font, color=sub)
-    ax.text(c2, info_y-0.8, f'下轨 {r["lower"]:.3f}', fontsize=info_font, color=sub)
-    ax.text(c1, info_y-1.6, f'上轨加速 {upper_acc:+.4f}', fontsize=info_font, color=sub)
-    ax.text(c2, info_y-1.6, f'价格加速 {price_acc:+.4f}', fontsize=info_font, color=sub)
-    ax.text(c1, info_y-2.4, f'趋势 {trend}', fontsize=info_font, color=fg)
+    c1, c2 = 0.5, 6.0
+    ax.text(c1, info_y,     f'RSI {rsi:.0f}',               fontsize=info_font, color=fg)
+    ax.text(c2, info_y,     f'BB {bb_pos:.0f}%',             fontsize=info_font, color=fg)
+    ax.text(c1, info_y-0.8, f'上轨 {r["upper"]:.3f}',        fontsize=info_font, color=fg)
+    ax.text(c2, info_y-0.8, f'下轨 {r["lower"]:.3f}',        fontsize=info_font, color=fg)
+    ax.text(c1, info_y-1.6, f'上轨加速 {upper_acc:+.4f}',    fontsize=info_font, color=fg)
+    ax.text(c2, info_y-1.6, f'价格加速 {price_acc:+.4f}',    fontsize=info_font, color=fg)
+    ax.text(c1, info_y-2.4, f'趋势 {trend}',                  fontsize=info_font, color=fg)
     ax.text(c2, info_y-2.4, f'近{lookback}日 {ret_lookback:+.1f}%', fontsize=info_font,
             color=up_c if ret_lookback>=0 else down_c, fontweight='bold')
 
