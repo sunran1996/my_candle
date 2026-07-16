@@ -104,34 +104,28 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
 
     # 6×10.5 inches, 适配 iPhone
     fig = plt.figure(figsize=(6, 10.5), facecolor=bg)
-    gs = fig.add_gridspec(4, 1, height_ratios=[0.4, 1.3, 1.8, 3.0], hspace=0.15,
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.3, 1.8, 3.0], hspace=0.15,
                           left=0.06, right=0.94, top=0.96, bottom=0.02)
 
-    # ── P0: 顶部留白 ──
-    ax0 = fig.add_subplot(gs[0])
-    ax0.set_facecolor(bg); ax0.axis('off')
-
     # ── P1: 信号卡 ──
-    ax = fig.add_subplot(gs[1])
+    ax = fig.add_subplot(gs[0])
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
     # 标题 + 日期 (靠近顶部)
-    ax.text(0.3, 9.9, f'{ETF_NAME}({ETF_SYMBOL})', fontsize=20, fontweight='bold', color=fg)
-    ax.text(0.3, 9.1, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
-    ax.text(9.7, 9.9, f'{price:.3f}', fontsize=24, fontweight='bold', color=fg, ha='right')
+    ax.text(0.3, 9.6, f'{ETF_NAME}({ETF_SYMBOL})', fontsize=20, fontweight='bold', color=fg)
+    ax.text(0.3, 8.8, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
+    ax.text(9.7, 9.6, f'{price:.3f}', fontsize=24, fontweight='bold', color=fg, ha='right')
 
-    # 指标信息 — 与标题拉开间距
+    # 指标信息 — 英文数值区 + 中文标签区
     info_font = 10
     info_y = 6.8
-    c1, c2 = 0.5, 6.0
-    ax.text(c1, info_y,     f'RSI {rsi:.0f}',               fontsize=info_font, color=fg)
-    ax.text(c2, info_y,     f'BB {bb_pos:.0f}%',             fontsize=info_font, color=fg)
-    ax.text(c1, info_y-0.8, f'上轨 {r["upper"]:.3f}',        fontsize=info_font, color=fg)
-    ax.text(c2, info_y-0.8, f'下轨 {r["lower"]:.3f}',        fontsize=info_font, color=fg)
-    ax.text(c1, info_y-1.6, f'上轨加速 {upper_acc:+.4f}',    fontsize=info_font, color=fg)
-    ax.text(c2, info_y-1.6, f'价格加速 {price_acc:+.4f}',    fontsize=info_font, color=fg)
-    ax.text(c1, info_y-2.4, f'趋势 {trend}',                  fontsize=info_font, color=fg)
-    ax.text(c2, info_y-2.4, f'近{lookback}日 {ret_lookback:+.1f}%', fontsize=info_font,
+    ax.text(0.5, info_y,     f'RSI {rsi:.0f}    BB {bb_pos:.0f}%    趋势 {trend}',
+            fontsize=info_font, color=fg)
+    ax.text(0.5, info_y-1.0, f'上轨 {r["upper"]:.3f}    下轨 {r["lower"]:.3f}',
+            fontsize=info_font, color=fg)
+    ax.text(0.5, info_y-2.0, f'上轨加速 {upper_acc:+.4f}    价格加速 {price_acc:+.4f}',
+            fontsize=info_font, color=fg)
+    ax.text(0.5, info_y-3.0, f'近{lookback}日收益 {ret_lookback:+.1f}%', fontsize=info_font,
             color=up_c if ret_lookback>=0 else down_c, fontweight='bold')
 
     # 操作建议 — 信息区下方
@@ -139,7 +133,7 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.text(3.0, 3.0, sig, fontsize=15, fontweight='bold', color='#000000', va='baseline')
 
     # ── P2: 净值曲线 ──
-    ax = fig.add_subplot(gs[2])
+    ax = fig.add_subplot(gs[1])
     ax.set_facecolor(bg)
     line_c = up_c if nvs[-1] >= 1 else down_c
     ax.fill_between(range(len(nvs)), 1.0, nvs, alpha=0.1, color=line_c)
@@ -162,7 +156,7 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.set_title(f'净值走势 ({lookback}日)', fontsize=11, fontweight='bold', color=fg, loc='left', pad=6)
 
     # ── P3: 月度收益看板 ──
-    ax = fig.add_subplot(gs[3])
+    ax = fig.add_subplot(gs[2])
     ax.set_facecolor(card_bg)
     ax.set_xlim(0, 10); ax.set_ylim(-0.5, len(monthly)+1.5); ax.axis('off')
 
