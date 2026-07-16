@@ -104,30 +104,31 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
 
     # 6×10.5 inches, 适配 iPhone
     fig = plt.figure(figsize=(6, 10.5), facecolor=bg)
-    gs = fig.add_gridspec(3, 1, height_ratios=[1.3, 1.8, 3.0], hspace=0.3,
-                          left=0.06, right=0.94, top=0.98, bottom=0.02)
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.3, 1.8, 3.0], hspace=0.2,
+                          left=0.06, right=0.94, top=0.92, bottom=0.02)
 
     # ── P1: 信号卡 ──
     ax = fig.add_subplot(gs[0])
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
-    # 标题: 红利低波 大字号
-    ax.text(0.3, 9.2, ETF_NAME, fontsize=22, fontweight='bold', color=fg)
-    ax.text(0.3, 8.2, r['date'].strftime('%Y/%m/%d'), fontsize=10, color=sub)
+    # 标题: 红利低波 + 代码
+    ax.text(0.3, 9.5, f'{ETF_NAME}', fontsize=22, fontweight='bold', color=fg)
+    ax.text(5.3, 9.5, ETF_SYMBOL, fontsize=10, color=sub, va='baseline')
+    ax.text(0.3, 8.5, r['date'].strftime('%Y/%m/%d'), fontsize=10, color=sub)
 
     # 信号: 小字号
-    ax.add_patch(plt.Rectangle((0, 4.5), 10, 3.2, color=accent_bg, zorder=0))
-    ax.add_patch(plt.Circle((1.2, 6.1), 0.3, color=accent_c, zorder=2))
-    ax.text(1.8, 6.1, sig, fontsize=18, fontweight='bold', color=accent_c, va='center')
-    ax.text(3.5, 6.1, f'RSI {rsi:.0f}  BB {bb_pos:.0f}%  {trend}', fontsize=10, color=sub, va='center')
+    ax.add_patch(plt.Rectangle((0, 4.2), 10, 3.2, color=accent_bg, zorder=0))
+    ax.add_patch(plt.Circle((1.2, 5.8), 0.3, color=accent_c, zorder=2))
+    ax.text(1.8, 5.8, sig, fontsize=18, fontweight='bold', color=accent_c, va='center')
+    ax.text(3.5, 5.8, f'RSI {rsi:.0f}  BB {bb_pos:.0f}%  {trend}', fontsize=10, color=sub, va='center')
 
-    # 价格 + BB轨道 大字
-    ax.text(9.7, 9.0, f'{price:.3f}', fontsize=26, fontweight='bold', color=fg, ha='right')
-    ax.text(9.7, 8.0, f'上轨 {r["upper"]:.3f}', fontsize=11, color=sub, ha='right')
-    ax.text(9.7, 7.2, f'下轨 {r["lower"]:.3f}', fontsize=11, color=sub, ha='right')
-    ax.text(0.3, 2.5, f'近{lookback}日 {ret_lookback:+.1f}%', fontsize=11,
+    # 价格 + BB轨道
+    ax.text(9.7, 9.2, f'{price:.3f}', fontsize=26, fontweight='bold', color=fg, ha='right')
+    ax.text(9.7, 8.2, f'上轨 {r["upper"]:.3f}', fontsize=11, color=sub, ha='right')
+    ax.text(9.7, 7.4, f'下轨 {r["lower"]:.3f}', fontsize=11, color=sub, ha='right')
+    ax.text(0.3, 2.2, f'近{lookback}日 {ret_lookback:+.1f}%', fontsize=11,
             color=up_c if ret_lookback>=0 else down_c, fontweight='bold')
-    ax.text(9.7, 2.5, f'上轨加速{upper_acc:+.4f} 价加速{price_acc:+.4f}', fontsize=8, color=sub, ha='right')
+    ax.text(9.7, 2.2, f'上轨加速{upper_acc:+.4f} 价加速{price_acc:+.4f}', fontsize=8, color=sub, ha='right')
 
     # ── P2: 净值曲线 ──
     ax = fig.add_subplot(gs[1])
