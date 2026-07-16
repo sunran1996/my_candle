@@ -186,11 +186,10 @@ def main():
         else:
             print("无 GH_TOKEN, 跳过图表上传")
 
-        # 4. 推送 — 图片URL放入body，Bark会自动渲染
+        # 4. 推送 — url参数让通知可点击查看收益图
         body = (f'价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%  {trend}\n'
                 f'近半年收益 {ret_pct:+.1f}%\n'
-                f'上轨加速度 {upper_acc:+.5f}  价格加速度 {price_acc:+.5f}\n'
-                f'{chart_url}')
+                f'上轨加速度 {upper_acc:+.5f}  价格加速度 {price_acc:+.5f}')
         send_bark(f'{ETF_NAME} {sig}', body, chart_url)
         print("完成!")
     except Exception as e:
