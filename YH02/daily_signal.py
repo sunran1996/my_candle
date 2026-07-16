@@ -10,12 +10,51 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 warnings.filterwarnings('ignore')
 
-# 跨平台: 英文 Times New Roman, 中文黑体
+# 跨平台字体
 _fonts = [f.name for f in fm.fontManager.ttflist]
-_cn = 'WenQuanYi Zen Hei' if 'WenQuanYi Zen Hei' in _fonts else ('SimHei' if 'SimHei' in _fonts else 'DejaVu Sans')
-plt.rcParams['font.serif'] = ['Times New Roman', _cn, 'DejaVu Serif']
-plt.rcParams['font.family'] = 'serif'
+CN_SANS = 'WenQuanYi Zen Hei' if 'WenQuanYi Zen Hei' in _fonts else ('SimHei' if 'SimHei' in _fonts else 'DejaVu Sans')
+CN_SERIF = 'SimSun' if 'SimSun' in _fonts else CN_SANS  # 宋体
+# 全局黑体, 信息区单独用SimSun
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['font.sans-serif'] = [CN_SANS, 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
+
+import re
+
+def mixed_text(ax, x, y, text, cn_family=None, en_family='Times New Roman',
+               fontsize=10, color='black', fontweight='normal', ha='left', va='baseline'):
+    """中英文混排: 中文用cn_family, 英文数字用Times New Roman, 自动拼接"""
+    if cn_family is None:
+        cn_family = CN_SANS
+    # 拆分: CJK字符 vs 非CJK
+    tokens = re.split(r'([一-鿿　-〿＀-￯]+)', text)
+    # 计算总宽度
+    renderer = ax.figure.canvas.get_renderer() if hasattr(ax.figure.canvas, 'get_renderer') else None
+    segments = []
+    total_w = 0
+    for tok in tokens:
+        if not tok: continue
+        is_cn = bool(re.match(r'[一-鿿]', tok))
+        fam = cn_family if is_cn else en_family
+        t = ax.text(0, 0, tok, fontsize=fontsize, family=fam, fontweight=fontweight, alpha=0)
+        bbox = t.get_window_extent(renderer)
+        w = bbox.width / ax.figure.dpi * 72  # pixels -> points
+        t.remove()
+        segments.append((tok, fam, w))
+        total_w += w
+    # 按对齐方式确定起始x
+    if ha == 'right':
+        start_x = x - total_w
+    elif ha == 'center':
+        start_x = x - total_w / 2
+    else:
+        start_x = x
+    # 逐段渲染
+    cx = start_x
+    for tok, fam, w in segments:
+        ax.text(cx, y, tok, fontsize=fontsize, color=color, fontweight=fontweight,
+                family=fam, ha='left', va=va)
+        cx += w
 
 ETF_SYMBOL = 'sh512890'; ETF_NAME = '红利低波'
 BB_PERIOD = 45; BB_STD = 2.0
@@ -108,8 +147,9 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax = fig.add_subplot(gs[0])
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
-    # 标题 + 日期
-    ax.text(0.3, 9.0, f'{ETF_NAME}({ETF_SYMBOL.upper()})', fontsize=20, fontweight='bold', color=fg)
+    # 标题 + 日期 (黑体)
+    mixed_text(ax, 0.3, 9.0, f'{ETF_NAME}({ETF_SYMBOL.upper()})',
+               cn_family=CN_SANS, fontsize=20, fontweight='bold', color=fg)
     ax.text(0.3, 8.2, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
 
     # 价格: 红涨绿跌 + 涨跌幅
@@ -118,22 +158,22 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.text(9.7, 9.2, f'{price:.3f}', fontsize=24, fontweight='bold', color=price_c, ha='right')
     ax.text(9.7, 8.2, f'{day_chg:+.2f}%', fontsize=10, color=price_c, ha='right')
 
-    # 指标信息 — 两列对齐
+    # 指标信息 — 两列对齐, SimSun宋体(自带衬线英文≈Times New Roman)
     info_font = 10
     info_y = 6.2
     c1, c2 = 0.5, 5.5
     row_gap = 0.9
-    ax.text(c1, info_y,       f'RSI {rsi:.0f}',           fontsize=info_font, color=fg)
-    ax.text(c2, info_y,       f'BB {bb_pos:.0f}%',         fontsize=info_font, color=fg)
-    ax.text(c1, info_y-row_gap,   f'上轨 {r["upper"]:.3f}',    fontsize=info_font, color=fg)
-    ax.text(c2, info_y-row_gap,   f'下轨 {r["lower"]:.3f}',    fontsize=info_font, color=fg)
-    ax.text(c1, info_y-row_gap*2, f'上轨加速 {upper_acc:+.4f}', fontsize=info_font, color=fg)
-    ax.text(c2, info_y-row_gap*2, f'价格加速 {price_acc:+.4f}', fontsize=info_font, color=fg)
-    ax.text(c1, info_y-row_gap*3, f'趋势 {trend}',              fontsize=info_font, color=fg)
+    ax.text(c1, info_y,       f'RSI {rsi:.0f}',           fontsize=info_font, color=fg, family='SimSun')
+    ax.text(c2, info_y,       f'BB {bb_pos:.0f}%',         fontsize=info_font, color=fg, family='SimSun')
+    ax.text(c1, info_y-row_gap,   f'上轨 {r["upper"]:.3f}',    fontsize=info_font, color=fg, family='SimSun')
+    ax.text(c2, info_y-row_gap,   f'下轨 {r["lower"]:.3f}',    fontsize=info_font, color=fg, family='SimSun')
+    ax.text(c1, info_y-row_gap*2, f'上轨加速 {upper_acc:+.4f}', fontsize=info_font, color=fg, family='SimSun')
+    ax.text(c2, info_y-row_gap*2, f'价格加速 {price_acc:+.4f}', fontsize=info_font, color=fg, family='SimSun')
+    ax.text(c1, info_y-row_gap*3, f'趋势 {trend}',              fontsize=info_font, color=fg, family='SimSun')
     ax.text(c2, info_y-row_gap*3, f'近{lookback}日 {ret_lookback:+.1f}%', fontsize=info_font,
-            color=up_c if ret_lookback>=0 else down_c, fontweight='bold')
+            color=up_c if ret_lookback>=0 else down_c, fontweight='bold', family='SimSun')
 
-    # 操作建议 — 拉开间距
+    # 操作建议 (宋体, 与信息区统一)
     ax.text(0.5, 1.0, '操作建议：', fontsize=13, color=fg)
     ax.text(3.0, 1.0, sig, fontsize=15, fontweight='bold', color='#000000', va='baseline')
 
