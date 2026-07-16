@@ -104,8 +104,8 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
 
     # 6×10.5 inches, 适配 iPhone
     fig = plt.figure(figsize=(6, 10.5), facecolor=bg)
-    gs = fig.add_gridspec(3, 1, height_ratios=[1.3, 1.8, 3.0], hspace=0.15,
-                          left=0.06, right=0.94, top=0.90, bottom=0.02)
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.5, 1.8, 3.0], hspace=0.2,
+                          left=0.06, right=0.94, top=0.85, bottom=0.02)
 
     # ── P1: 信号卡 ──
     ax = fig.add_subplot(gs[0])
@@ -116,9 +116,9 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.text(0.3, 8.2, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
     ax.text(9.7, 9.0, f'{price:.3f}', fontsize=24, fontweight='bold', color=fg, ha='right')
 
-    # 指标信息 — 英文数值区 + 中文标签区
+    # 指标信息
     info_font = 10
-    info_y = 6.8
+    info_y = 6.5
     ax.text(0.5, info_y,     f'RSI {rsi:.0f}    BB {bb_pos:.0f}%    趋势 {trend}',
             fontsize=info_font, color=fg)
     ax.text(0.5, info_y-1.0, f'上轨 {r["upper"]:.3f}    下轨 {r["lower"]:.3f}',
@@ -128,9 +128,9 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.text(0.5, info_y-3.0, f'近{lookback}日收益 {ret_lookback:+.1f}%', fontsize=info_font,
             color=up_c if ret_lookback>=0 else down_c, fontweight='bold')
 
-    # 操作建议 — 信息区下方
-    ax.text(0.5, 3.0, '操作建议：', fontsize=13, color=fg)
-    ax.text(3.0, 3.0, sig, fontsize=15, fontweight='bold', color='#000000', va='baseline')
+    # 操作建议 — 信息区下方, 留足间距
+    ax.text(0.5, 2.0, '操作建议：', fontsize=13, color=fg)
+    ax.text(3.0, 2.0, sig, fontsize=15, fontweight='bold', color='#000000', va='baseline')
 
     # ── P2: 净值曲线 ──
     ax = fig.add_subplot(gs[1])
