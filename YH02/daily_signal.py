@@ -104,11 +104,15 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
 
     # 6×10.5 inches, 适配 iPhone
     fig = plt.figure(figsize=(6, 10.5), facecolor=bg)
-    gs = fig.add_gridspec(3, 1, height_ratios=[1.3, 1.8, 3.0], hspace=0.2,
-                          left=0.06, right=0.94, top=0.92, bottom=0.02)
+    gs = fig.add_gridspec(4, 1, height_ratios=[0.4, 1.3, 1.8, 3.0], hspace=0.15,
+                          left=0.06, right=0.94, top=0.96, bottom=0.02)
+
+    # ── P0: 顶部留白 ──
+    ax0 = fig.add_subplot(gs[0])
+    ax0.set_facecolor(bg); ax0.axis('off')
 
     # ── P1: 信号卡 ──
-    ax = fig.add_subplot(gs[0])
+    ax = fig.add_subplot(gs[1])
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
     # 标题: 红利低波 + 代码
@@ -131,7 +135,7 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.text(9.7, 2.2, f'上轨加速{upper_acc:+.4f} 价加速{price_acc:+.4f}', fontsize=8, color=sub, ha='right')
 
     # ── P2: 净值曲线 ──
-    ax = fig.add_subplot(gs[1])
+    ax = fig.add_subplot(gs[2])
     ax.set_facecolor(bg)
     line_c = up_c if nvs[-1] >= 1 else down_c
     ax.fill_between(range(len(nvs)), 1.0, nvs, alpha=0.1, color=line_c)
@@ -154,7 +158,7 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.set_title(f'净值走势 ({lookback}日)', fontsize=11, fontweight='bold', color=fg, loc='left', pad=6)
 
     # ── P3: 月度收益看板 ──
-    ax = fig.add_subplot(gs[2])
+    ax = fig.add_subplot(gs[3])
     ax.set_facecolor(card_bg)
     ax.set_xlim(0, 10); ax.set_ylim(-0.5, len(monthly)+1.5); ax.axis('off')
 
@@ -211,8 +215,8 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
 
 def upload_chart(token, img_bytes):
     """上传到 GitHub, 每次用新文件名避免CDN缓存, 同时更新latest"""
-    today = pd.Timestamp.now().strftime('%Y%m%d')
-    filename = f'chart_{today}.png'
+    now_str = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'chart_{now_str}.png'
     ctx = ssl._create_unverified_context()
     headers = {'Authorization': 'Bearer ' + token, 'User-Agent': 'YH02-daily'}
 
@@ -226,7 +230,7 @@ def upload_chart(token, img_bytes):
     except:
         pass
     body = json.dumps({
-        'message': f'daily chart {today}',
+        'message': f'daily chart {now_str}',
         'content': base64.b64encode(img_bytes).decode('ascii'),
         'branch': 'main',
         **({'sha': sha_day} if sha_day else {})
