@@ -149,7 +149,7 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
         mx = 0.5 + col * 5.0; my = 5.5 - row * 1.6
         vc = UP if value.startswith('+') else (DN if value.startswith('-') else FG)
         ax.text(mx, my, label, fontsize=10, color=SUB, family='SimSun')
-        ax.text(mx, my-0.55, value, fontsize=10, color=vc, fontweight='bold')
+        ax.text(mx, my-0.85, value, fontsize=10, color=vc, fontweight='bold', family='Times New Roman')
 
     # ═══════ P2: NAV CHART ═══════
     ax = fig.add_subplot(gs[1]); ax.set_facecolor(CARD)
