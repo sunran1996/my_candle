@@ -121,21 +121,24 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.text(9.7, 9.2, f'{price:.3f}', fontsize=24, fontweight='bold', color=price_c, ha='right')
     ax.text(9.7, 8.2, f'{day_chg:+.2f}%', fontsize=10, color=price_c, ha='right')
 
-    # 指标信息
+    # 指标信息 — 两列对齐
     info_font = 10
     info_y = 6.2
-    ax.text(0.5, info_y,     f'RSI {rsi:.0f}    BB {bb_pos:.0f}%    趋势 {trend}',
-            fontsize=info_font, color=fg)
-    ax.text(0.5, info_y-1.0, f'上轨 {r["upper"]:.3f}    下轨 {r["lower"]:.3f}',
-            fontsize=info_font, color=fg)
-    ax.text(0.5, info_y-2.0, f'上轨加速 {upper_acc:+.4f}    价格加速 {price_acc:+.4f}',
-            fontsize=info_font, color=fg)
-    ax.text(0.5, info_y-3.0, f'近{lookback}日收益 {ret_lookback:+.1f}%', fontsize=info_font,
+    c1, c2 = 0.5, 5.5
+    row_gap = 0.9
+    ax.text(c1, info_y,       f'RSI {rsi:.0f}',           fontsize=info_font, color=fg)
+    ax.text(c2, info_y,       f'BB {bb_pos:.0f}%',         fontsize=info_font, color=fg)
+    ax.text(c1, info_y-row_gap,   f'上轨 {r["upper"]:.3f}',    fontsize=info_font, color=fg)
+    ax.text(c2, info_y-row_gap,   f'下轨 {r["lower"]:.3f}',    fontsize=info_font, color=fg)
+    ax.text(c1, info_y-row_gap*2, f'上轨加速 {upper_acc:+.4f}', fontsize=info_font, color=fg)
+    ax.text(c2, info_y-row_gap*2, f'价格加速 {price_acc:+.4f}', fontsize=info_font, color=fg)
+    ax.text(c1, info_y-row_gap*3, f'趋势 {trend}',              fontsize=info_font, color=fg)
+    ax.text(c2, info_y-row_gap*3, f'近{lookback}日 {ret_lookback:+.1f}%', fontsize=info_font,
             color=up_c if ret_lookback>=0 else down_c, fontweight='bold')
 
-    # 操作建议 — 信息区下方, 留足间距
-    ax.text(0.5, 2.0, '操作建议：', fontsize=13, color=fg)
-    ax.text(3.0, 2.0, sig, fontsize=15, fontweight='bold', color='#000000', va='baseline')
+    # 操作建议 — 拉开间距
+    ax.text(0.5, 1.0, '操作建议：', fontsize=13, color=fg)
+    ax.text(3.0, 1.0, sig, fontsize=15, fontweight='bold', color='#000000', va='baseline')
 
     # ── P2: 净值曲线 ──
     ax = fig.add_subplot(gs[1])
@@ -152,14 +155,12 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     # 标注峰值和谷值
     peak_idx = np.argmax(nvs); valley_idx = np.argmin(nvs)
     peak_val = nvs[peak_idx]; valley_val = nvs[valley_idx]
-    ax.annotate(f'最高 {(peak_val-1)*100:+.1f}%', xy=(peak_idx, peak_val),
-                xytext=(peak_idx, peak_val + (ymax-ymin)*0.08), fontsize=8, color=up_c,
-                ha='center', fontweight='bold',
-                arrowprops=dict(arrowstyle='->', color=up_c, lw=0.8))
-    ax.annotate(f'最低 {(valley_val-1)*100:+.1f}%', xy=(valley_idx, valley_val),
-                xytext=(valley_idx, valley_val - (ymax-ymin)*0.08), fontsize=8, color=down_c,
-                ha='center', fontweight='bold',
-                arrowprops=dict(arrowstyle='->', color=down_c, lw=0.8))
+    ax.annotate(f'{(peak_val-1)*100:+.1f}%', xy=(peak_idx, peak_val),
+                xytext=(peak_idx, peak_val + (ymax-ymin)*0.06), fontsize=9, color=up_c,
+                ha='center', fontweight='bold')
+    ax.annotate(f'{(valley_val-1)*100:+.1f}%', xy=(valley_idx, valley_val),
+                xytext=(valley_idx, valley_val - (ymax-ymin)*0.06), fontsize=9, color=down_c,
+                ha='center', fontweight='bold')
     if len(nvs) >= 2:
         step = max(1, len(dates)//4)
         ticks = list(range(0, len(dates), step))
