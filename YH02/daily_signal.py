@@ -104,8 +104,8 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
 
     # 6×10.5 inches, 适配 iPhone
     fig = plt.figure(figsize=(6, 10.5), facecolor=bg)
-    gs = fig.add_gridspec(3, 1, height_ratios=[1.5, 1.8, 3.0], hspace=0.2,
-                          left=0.06, right=0.94, top=0.85, bottom=0.02)
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.8, 1.8, 3.0], hspace=0.25,
+                          left=0.06, right=0.94, top=0.82, bottom=0.02)
 
     # ── P1: 信号卡 ──
     ax = fig.add_subplot(gs[0])
@@ -114,11 +114,16 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     # 标题 + 日期
     ax.text(0.3, 9.0, f'{ETF_NAME}({ETF_SYMBOL})', fontsize=20, fontweight='bold', color=fg)
     ax.text(0.3, 8.2, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
-    ax.text(9.7, 9.0, f'{price:.3f}', fontsize=24, fontweight='bold', color=fg, ha='right')
+
+    # 价格: 红涨绿跌 + 涨跌幅
+    day_chg = (price - prev['close']) / prev['close'] * 100
+    price_c = up_c if day_chg >= 0 else down_c
+    ax.text(9.7, 9.2, f'{price:.3f}', fontsize=24, fontweight='bold', color=price_c, ha='right')
+    ax.text(9.7, 8.2, f'{day_chg:+.2f}%', fontsize=10, color=price_c, ha='right')
 
     # 指标信息
     info_font = 10
-    info_y = 6.5
+    info_y = 6.2
     ax.text(0.5, info_y,     f'RSI {rsi:.0f}    BB {bb_pos:.0f}%    趋势 {trend}',
             fontsize=info_font, color=fg)
     ax.text(0.5, info_y-1.0, f'上轨 {r["upper"]:.3f}    下轨 {r["lower"]:.3f}',
@@ -143,6 +148,18 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.set_xlim(-0.5, len(nvs)-0.5)
     ymin = min(0.85, min(nvs)*0.98); ymax = max(1.15, max(nvs)*1.02)
     ax.set_ylim(ymin, ymax)
+
+    # 标注峰值和谷值
+    peak_idx = np.argmax(nvs); valley_idx = np.argmin(nvs)
+    peak_val = nvs[peak_idx]; valley_val = nvs[valley_idx]
+    ax.annotate(f'最高 {(peak_val-1)*100:+.1f}%', xy=(peak_idx, peak_val),
+                xytext=(peak_idx, peak_val + (ymax-ymin)*0.08), fontsize=8, color=up_c,
+                ha='center', fontweight='bold',
+                arrowprops=dict(arrowstyle='->', color=up_c, lw=0.8))
+    ax.annotate(f'最低 {(valley_val-1)*100:+.1f}%', xy=(valley_idx, valley_val),
+                xytext=(valley_idx, valley_val - (ymax-ymin)*0.08), fontsize=8, color=down_c,
+                ha='center', fontweight='bold',
+                arrowprops=dict(arrowstyle='->', color=down_c, lw=0.8))
     if len(nvs) >= 2:
         step = max(1, len(dates)//4)
         ticks = list(range(0, len(dates), step))
