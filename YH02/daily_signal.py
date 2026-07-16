@@ -7,8 +7,17 @@ import urllib.request as ur
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 warnings.filterwarnings('ignore')
-plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+
+# 跨平台中文字体
+_fonts = [f.name for f in fm.fontManager.ttflist]
+if 'WenQuanYi Zen Hei' in _fonts:
+    plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'DejaVu Sans']
+elif 'SimHei' in _fonts:
+    plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+else:
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
 ETF_SYMBOL = 'sh512890'; ETF_NAME = '红利低波'
@@ -156,37 +165,38 @@ def send_bark(title, body, chart_url):
         print(f"推送失败: {e}")
 
 def main():
-    # 1. 数据
-    df = ak.fund_etf_hist_sina(symbol=ETF_SYMBOL)
-    df['date'] = pd.to_datetime(df['date']); df = df.sort_values('date').reset_index(drop=True)
-    df = compute_indicators(df)
+    try:
+        # 1. 数据
+        print("获取数据...")
+        df = ak.fund_etf_hist_sina(symbol=ETF_SYMBOL)
+        df['date'] = pd.to_datetime(df['date']); df = df.sort_values('date').reset_index(drop=True)
+        df = compute_indicators(df)
 
-    # 2. 生成图表
-    print("生成图表...")
-    img_bytes, sig, price, rsi, bb_pos, trend, upper_acc, price_acc, ret_pct = gen_chart(df)
+        # 2. 生成图表
+        print("生成图表...")
+        img_bytes, sig, price, rsi, bb_pos, trend, upper_acc, price_acc, ret_pct = gen_chart(df)
 
-    # 3. 上传 GitHub
-    token = os.environ.get('GH_TOKEN', '')
-    if not token:
-        # 尝试从文件读取
-        try:
-            token = open('github_token.txt').read().strip()
-        except:
-            pass
+        # 3. 上传 GitHub
+        token = os.environ.get('GH_TOKEN', '')
+        chart_url = ''
+        if token:
+            print("上传图表...")
+            chart_url = upload_chart(token, img_bytes)
+            print(f"  {chart_url}")
+        else:
+            print("无 GH_TOKEN, 跳过图表上传")
 
-    chart_url = ''
-    if token:
-        print("上传图表...")
-        chart_url = upload_chart(token, img_bytes)
-        print(f"  {chart_url}")
-    else:
-        print("无 GitHub Token, 跳过图表上传")
-
-    # 4. 推送
-    body = (f'价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%  {trend}\n'
-            f'近半年收益 {ret_pct:+.1f}%\n'
-            f'上轨加速度 {upper_acc:+.5f}  价格加速度 {price_acc:+.5f}')
-    send_bark(f'{ETF_NAME} {sig}', body, chart_url)
+        # 4. 推送
+        body = (f'价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%  {trend}\n'
+                f'近半年收益 {ret_pct:+.1f}%\n'
+                f'上轨加速度 {upper_acc:+.5f}  价格加速度 {price_acc:+.5f}')
+        send_bark(f'{ETF_NAME} {sig}', body, chart_url)
+        print("完成!")
+    except Exception as e:
+        print(f"执行失败: {e}")
+        import traceback; traceback.print_exc()
+        # 至少发一条失败通知
+        send_bark(f'{ETF_NAME} 信号获取失败', str(e)[:200], '')
 
 if __name__ == '__main__':
     main()
