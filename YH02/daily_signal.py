@@ -43,51 +43,19 @@ def compute_indicators(df):
                              loss.ewm(alpha=1/RSI_PERIOD, adjust=False).mean().replace(0, np.nan))
     return df
 
+def month_returns(df, n_months=12):
+    """计算最近N个月的月度收益"""
+    df = df.copy()
+    df['month'] = df['date'].dt.to_period('M')
+    monthly = df.groupby('month').agg(
+        open=('adj_close', 'first'),
+        close=('adj_close', 'last')
+    )
+    monthly['ret'] = (monthly['close'] / monthly['open'] - 1) * 100
+    return monthly.tail(n_months)
+
 def gen_chart(df, nav_start=1_000_000, lookback=180):
-    """生成近期收益图"""
-    recent = df.tail(lookback).copy()
-    # 模拟净值: 用 adj_close 归一化
-    recent['nav'] = nav_start * recent['adj_close'] / recent['adj_close'].iloc[0]
-
-    # 上证指数对比
-    try:
-        sh = ak.stock_zh_index_daily(symbol='sh000001')
-        sh['date'] = pd.to_datetime(sh['date']); sh = sh.sort_values('date')
-        sh = sh[sh['date'] >= recent['date'].iloc[0]]
-        if len(sh) > 1:
-            sh['sh_nav'] = nav_start * sh['close'] / sh['close'].iloc[0]
-            sh_dates = sh['date'].tolist()
-            sh_vals = (sh['sh_nav'] / nav_start).tolist()
-        else:
-            sh_vals = []
-    except:
-        sh_vals = []
-
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5.5), facecolor='white',
-                              width_ratios=[2.5, 1], gridspec_kw={'wspace': 0.05})
-    fig.subplots_adjust(left=0.06, right=0.94, top=0.85, bottom=0.15)
-
-    # 左: 净值曲线
-    ax = axes[0]
-    nvs = (recent['nav'] / nav_start).tolist()
-    dates = recent['date'].dt.strftime('%m-%d').tolist()
-    ax.fill_between(range(len(nvs)), 1.0, nvs, alpha=0.08, color='#27ae60')
-    ax.plot(range(len(nvs)), nvs, color='#27ae60', lw=1.8, label=ETF_NAME)
-    if sh_vals:
-        ax.plot(range(len(sh_vals)), sh_vals, color='#bdc3c7', lw=1, ls='--', alpha=0.6, label='上证指数')
-    ax.scatter(len(nvs)-1, nvs[-1], color='#27ae60', s=50, zorder=5)
-    ax.scatter(len(nvs)-1, nvs[-1], color='#27ae60', s=150, zorder=4, alpha=0.12)
-    ax.axhline(y=1.0, color='#2c3e50', lw=1.2)
-    ax.legend(fontsize=8, loc='upper left', framealpha=0.8)
-    ax.set_xlim(-0.5, len(nvs)-0.5)
-    if len(nvs) >= 2:
-        ax.set_xticks([0, len(nvs)-1])
-        ax.set_xticklabels([dates[0], dates[-1]], fontsize=9)
-    ax.tick_params(labelsize=8)
-    for spine in ax.spines.values(): spine.set_visible(True); spine.set_color('#2c3e50'); spine.set_linewidth(1.2)
-    ax.grid(True, alpha=0.1)
-
-    # 右: 信息卡
+    """iPhone竖屏收益图: 信号卡 + 净值曲线 + 月度收益表"""
     r = df.iloc[-1]; prev = df.iloc[-2]
     price = r['close']; rsi = r['rsi']
     bb_pos = (r['adj_close'] - r['lower']) / (r['upper'] - r['lower']) * 100
@@ -106,27 +74,128 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
         buy_ok = (bb_buy or rsi_buy)
         sell_ok = (bb_sell or rsi >= RSI_OVERBOUGHT)
 
-    if buy_ok and not sell_ok: sig = '🟢 买入'
-    elif sell_ok and not buy_ok: sig = '🔴 卖出'
-    else: sig = '⚪ 持有'
+    if buy_ok and not sell_ok: sig = '买入'
+    elif sell_ok and not buy_ok: sig = '卖出'
+    else: sig = '持有'
 
-    trend = '扩张↑' if expanding else '收缩↓'
-    ret_pct = (nvs[-1] - 1) * 100
+    trend = '扩张' if expanding else '收缩'
 
-    ax = axes[1]; ax.axis('off'); ax.set_xlim(0, 10); ax.set_ylim(0, 12)
-    ax.text(0, 11, ETF_NAME, fontsize=16, fontweight='bold', color='black')
-    ax.text(0, 10, f'YH02 每日信号', fontsize=10, color='#95a5a6')
-    ax.text(0, 8.5, f'{price:.4f}', fontsize=22, color='#c0392b', fontweight='bold')
-    ax.text(0, 7.2, '最新价', fontsize=9, color='#95a5a6')
-    ax.text(0, 5.8, sig, fontsize=22)
-    ax.text(0, 3.8, f'RSI {rsi:.1f}  |  BB {bb_pos:.0f}%  |  {trend}', fontsize=11, color='black')
-    ax.text(0, 2.5, f'近{lookback}日收益 {ret_pct:+.1f}%', fontsize=13, color='#27ae60' if ret_pct>=0 else '#e74c3c', fontweight='bold')
-    ax.text(0, 1.2, r['date'].strftime('%Y-%m-%d'), fontsize=10, color='#95a5a6')
+    # 净值曲线数据
+    recent = df.tail(lookback).copy()
+    recent['nav'] = nav_start * recent['adj_close'] / recent['adj_close'].iloc[0]
+    nvs = (recent['nav'] / nav_start).tolist()
+    dates = recent['date'].dt.strftime('%m/%d').tolist()
+    ret_lookback = (nvs[-1] - 1) * 100
+
+    # 月度收益
+    monthly = month_returns(df, 12)
+
+    # ===== iPhone 比例: 6×10 inches =====
+    fig = plt.figure(figsize=(6, 10), facecolor='#0d1117')
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.2, 2.0, 2.5], hspace=0.25,
+                          left=0.08, right=0.92, top=0.97, bottom=0.03)
+
+    bg = '#0d1117'; fg = '#c9d1d9'; accent = '#58a6ff'; green = '#3fb950'; red = '#f85149'
+    card_bg = '#161b22'; border = '#30363d'
+
+    # ── P1: 信号卡 ──
+    ax = fig.add_subplot(gs[0])
+    ax.set_facecolor(bg)
+    ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
+
+    # 信号圆点
+    if sig == '买入': dot_c = green; bg_c = '#1a3a2a'
+    elif sig == '卖出': dot_c = red; bg_c = '#3a1a1a'
+    else: dot_c = '#8b949e'; bg_c = '#1a1c20'
+
+    ax.add_patch(plt.Rectangle((0, 0), 10, 10, color=bg_c, zorder=0))
+    ax.add_patch(plt.Circle((1.8, 5), 0.45, color=dot_c, zorder=2))
+    ax.text(2.6, 5, sig, fontsize=28, fontweight='bold', color=dot_c, va='center')
+    ax.text(2.6, 3.2, r['date'].strftime('%Y年%m月%d日'), fontsize=12, color='#8b949e', va='center')
+    ax.text(0.3, 8.5, ETF_NAME, fontsize=14, color='#8b949e')
+    ax.text(0.3, 7.2, 'YH02', fontsize=11, color='#484f58')
+
+    # 价格和指标
+    ax.text(7.0, 8.5, '价格', fontsize=9, color='#8b949e', ha='right')
+    ax.text(7.0, 6.8, f'{price:.4f}', fontsize=22, fontweight='bold', color=fg, ha='right')
+    ax.text(7.0, 4.5, f'RSI {rsi:.0f}  BB {bb_pos:.0f}%  {trend}', fontsize=11, color='#8b949e', ha='right')
+    ax.text(7.0, 3.2, f'{lookback}日 {ret_lookback:+.1f}%', fontsize=13, color=green if ret_lookback>=0 else red, ha='right', fontweight='bold')
+
+    # ── P2: 净值曲线 ──
+    ax = fig.add_subplot(gs[1])
+    ax.set_facecolor(card_bg)
+    ax.fill_between(range(len(nvs)), 1.0, nvs, alpha=0.15, color=green if nvs[-1]>=1 else red)
+    ax.plot(range(len(nvs)), nvs, color=fg, lw=2.0)
+    ax.scatter(len(nvs)-1, nvs[-1], color=green if nvs[-1]>=1 else red, s=40, zorder=5)
+    ax.axhline(y=1.0, color=border, lw=1, ls='--')
+    ax.set_xlim(-0.5, len(nvs)-0.5)
+    ymin = min(0.85, min(nvs)*0.98); ymax = max(1.15, max(nvs)*1.02)
+    ax.set_ylim(ymin, ymax)
+    if len(nvs) >= 2:
+        ax.set_xticks([0, len(nvs)//2, len(nvs)-1])
+        ax.set_xticklabels([dates[0], dates[len(dates)//2], dates[-1]], fontsize=8, color='#8b949e')
+    ax.tick_params(labelsize=8, colors='#8b949e', left=False)
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.3f}'))
+    for spine in ax.spines.values(): spine.set_color(border); spine.set_linewidth(0.5)
+    ax.grid(True, alpha=0.1, color=fg)
+    ax.set_title(f'{lookback}日净值', fontsize=11, color='#8b949e', loc='left', pad=4)
+
+    # ── P3: 月度收益看板 ──
+    ax = fig.add_subplot(gs[2])
+    ax.set_facecolor(card_bg)
+    ax.set_xlim(0, 12); ax.set_ylim(-1, len(monthly)); ax.axis('off')
+
+    ax.text(0, len(monthly), '月度收益', fontsize=11, color='#8b949e', va='bottom')
+    ax.text(12, len(monthly), 'YH02', fontsize=9, color='#484f58', ha='right', va='bottom')
+
+    col_w = [3.0, 2.2, 2.2, 2.2, 2.2]  # 月份, 本策略, 买入持有, 超额
+    col_x = [0]
+    for w in col_w[:-1]: col_x.append(col_x[-1] + w)
+
+    headers = ['月份', '策略', '持有', '超额', '信号']
+    for j, (hdr, cx) in enumerate(zip(headers, col_x)):
+        ax.text(cx, len(monthly)-1, hdr, fontsize=8, color='#484f58', fontweight='bold')
+
+    # 计算买入持有月度收益
+    df_m = df.copy()
+    df_m['month'] = df_m['date'].dt.to_period('M')
+    bh_monthly = df_m.groupby('month').agg(bh_open=('close','first'), bh_close=('close','last'))
+    bh_monthly['bh_ret'] = (bh_monthly['bh_close'] / bh_monthly['bh_open'] - 1) * 100
+    bh_map = bh_monthly['bh_ret'].to_dict()
+
+    for i, (m, row) in enumerate(monthly.iterrows()):
+        y_pos = len(monthly) - 2 - i
+        bh_ret = bh_map.get(m, 0)
+        alpha_v = row['ret'] - bh_ret
+        # 背景条纹
+        if i % 2 == 0:
+            ax.add_patch(plt.Rectangle((0, y_pos-0.35), 12, 0.7, color='#ffffff04', zorder=0))
+
+        ax.text(col_x[0], y_pos, str(m), fontsize=9, color=fg)
+        ax.text(col_x[1], y_pos, f'{row["ret"]:+.1f}%', fontsize=9,
+                color=green if row['ret']>=0 else red, fontweight='bold')
+        ax.text(col_x[2], y_pos, f'{bh_ret:+.1f}%', fontsize=8, color='#8b949e')
+        ax.text(col_x[3], y_pos, f'{alpha_v:+.1f}%', fontsize=8,
+                color=green if alpha_v>=0 else red)
+        # 信号摘要
+        sig_count = len(df[(df['date'].dt.to_period('M') == m)])
+        if row['ret'] > 2: s = '★'
+        elif row['ret'] > 0: s = '↑'
+        elif row['ret'] > -2: s = '—'
+        else: s = '↓'
+        ax.text(col_x[4], y_pos, s, fontsize=9, color=fg, ha='center')
+
+    # 分割线
+    for spine in ax.spines.values(): spine.set_color(border); spine.set_linewidth(0.5)
+
+    # 底部署名
+    fig.text(0.5, 0.01, 'YH02 · 自动生成 · 投资有风险', fontsize=7, color='#484f58',
+             ha='center', va='bottom')
 
     buf = io.BytesIO()
-    plt.savefig(buf, dpi=120, bbox_inches='tight', facecolor='white')
+    plt.savefig(buf, dpi=150, bbox_inches='tight', facecolor=bg, edgecolor='none')
     plt.close()
-    return buf.getvalue(), sig, price, rsi, bb_pos, trend, upper_acc, price_acc, ret_pct
+    return buf.getvalue(), sig, price, rsi, bb_pos, trend, upper_acc, price_acc, ret_lookback
 
 def upload_chart(token, img_bytes):
     """上传到 GitHub, 返回 CDN URL"""
@@ -197,13 +266,14 @@ def main():
         body = (f'价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%  {trend}\n'
                 f'近半年收益 {ret_pct:+.1f}%\n'
                 f'上轨加速度 {upper_acc:+.5f}  价格加速度 {price_acc:+.5f}')
-        send_bark(f'{ETF_NAME} {sig}', body, chart_url)
+        emoji = {'买入': '🟢', '卖出': '🔴'}.get(sig, '⚪')
+        send_bark(f'{ETF_NAME} {emoji} {sig}', body, chart_url)
         print("完成!")
     except Exception as e:
         print(f"执行失败: {e}")
         import traceback; traceback.print_exc()
         # 至少发一条失败通知
-        send_bark(f'{ETF_NAME} 信号获取失败', str(e)[:200], '')
+        send_bark(f'{ETF_NAME} 信号失败', str(e)[:200], '')
 
 if __name__ == '__main__':
     main()
