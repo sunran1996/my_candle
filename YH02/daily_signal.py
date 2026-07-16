@@ -203,29 +203,45 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     return buf.getvalue(), sig, price, rsi, bb_pos, trend, upper_acc, price_acc, ret_lookback
 
 def upload_chart(token, img_bytes):
-    """上传到 GitHub, 返回 CDN URL"""
-    api = f'https://api.github.com/repos/{REPO}/contents/YH02/live_chart.png'
+    """上传到 GitHub, 每次用新文件名避免CDN缓存, 同时更新latest"""
+    today = pd.Timestamp.now().strftime('%Y%m%d')
+    filename = f'chart_{today}.png'
     ctx = ssl._create_unverified_context()
     headers = {'Authorization': 'Bearer ' + token, 'User-Agent': 'YH02-daily'}
 
+    # 上传当日文件
+    api = f'https://api.github.com/repos/{REPO}/contents/YH02/{filename}'
+    body = json.dumps({
+        'message': f'daily chart {today}',
+        'content': base64.b64encode(img_bytes).decode('ascii'),
+        'branch': 'main',
+    }).encode()
+    try:
+        ur.urlopen(ur.Request(api, data=body, headers={**headers, 'Content-Type': 'application/json'}, method='PUT'),
+                   timeout=15, context=ctx)
+    except Exception as e:
+        print(f"  上传新文件失败: {e}")
+
+    # 同时更新 live_chart.png (覆写, jsDelivr会慢慢刷新)
+    api2 = f'https://api.github.com/repos/{REPO}/contents/YH02/live_chart.png'
     sha = None
     try:
-        req = ur.Request(api, headers=headers)
+        req = ur.Request(api2, headers=headers)
         r = json.loads(ur.urlopen(req, timeout=10, context=ctx).read())
         sha = r.get('sha')
     except:
         pass
-
-    body = json.dumps({
+    body2 = json.dumps({
         'message': 'daily chart',
         'content': base64.b64encode(img_bytes).decode('ascii'),
         'branch': 'main',
         **({'sha': sha} if sha else {})
     }).encode()
-    ur.urlopen(ur.Request(api, data=body, headers={**headers, 'Content-Type': 'application/json'}, method='PUT'),
+    ur.urlopen(ur.Request(api2, data=body2, headers={**headers, 'Content-Type': 'application/json'}, method='PUT'),
                timeout=15, context=ctx)
 
-    return f'https://cdn.jsdelivr.net/gh/{REPO}@main/YH02/live_chart.png'
+    # 返回当日文件URL (新URL不会被CDN缓存)
+    return f'https://cdn.jsdelivr.net/gh/{REPO}@main/YH02/{filename}'
 
 def send_bark(title, body, chart_url):
     """推送到手机Bark (带图片)"""
