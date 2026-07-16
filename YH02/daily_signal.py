@@ -152,7 +152,7 @@ def upload_chart(token, img_bytes):
                timeout=15, context=ctx)
 
     ts = int(time.time())
-    return f'https://cdn.jsdelivr.net/gh/{REPO}@main/YH02/live_chart.png?t={ts}'
+    return f'https://raw.githubusercontent.com/{REPO}/main/YH02/live_chart.png?t={ts}'
 
 def send_bark(title, body, chart_url):
     """推送到手机Bark (带图片)"""
