@@ -115,14 +115,14 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax = fig.add_subplot(gs[1])
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
-    # 标题 + 日期 (留更多行距)
-    ax.text(0.3, 9.8, f'{ETF_NAME}({ETF_SYMBOL})', fontsize=20, fontweight='bold', color=fg)
-    ax.text(0.3, 9.0, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
-    ax.text(9.7, 9.8, f'{price:.3f}', fontsize=24, fontweight='bold', color=fg, ha='right')
+    # 标题 + 日期 (靠近顶部)
+    ax.text(0.3, 9.9, f'{ETF_NAME}({ETF_SYMBOL})', fontsize=20, fontweight='bold', color=fg)
+    ax.text(0.3, 9.1, r['date'].strftime('%Y/%m/%d'), fontsize=9, color=sub)
+    ax.text(9.7, 9.9, f'{price:.3f}', fontsize=24, fontweight='bold', color=fg, ha='right')
 
-    # 指标信息 — 标题下方, 留够行距
+    # 指标信息 — 与标题拉开间距
     info_font = 10
-    info_y = 7.5
+    info_y = 6.8
     c1, c2 = 0.5, 6.0
     ax.text(c1, info_y,     f'RSI {rsi:.0f}',               fontsize=info_font, color=fg)
     ax.text(c2, info_y,     f'BB {bb_pos:.0f}%',             fontsize=info_font, color=fg)
@@ -135,8 +135,8 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
             color=up_c if ret_lookback>=0 else down_c, fontweight='bold')
 
     # 操作建议 — 信息区下方
-    ax.text(0.5, 3.2, '操作建议：', fontsize=11, color=fg)
-    ax.text(3.0, 3.2, sig, fontsize=18, fontweight='bold', color='#000000', va='baseline')
+    ax.text(0.5, 3.0, '操作建议：', fontsize=13, color=fg)
+    ax.text(3.0, 3.0, sig, fontsize=15, fontweight='bold', color='#000000', va='baseline')
 
     # ── P2: 净值曲线 ──
     ax = fig.add_subplot(gs[2])
