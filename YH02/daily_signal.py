@@ -90,107 +90,112 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     # 月度收益
     monthly = month_returns(df, 12)
 
-    # ===== iPhone 比例: 6×10 inches =====
-    fig = plt.figure(figsize=(6, 10), facecolor='#0d1117')
-    gs = fig.add_gridspec(3, 1, height_ratios=[1.2, 2.0, 2.5], hspace=0.25,
-                          left=0.08, right=0.92, top=0.97, bottom=0.03)
+    # ===== 浅色主题 =====
+    bg = '#FFFFFF'
+    card_bg = '#F8F9FA'
+    fg = '#1A1A2E'
+    sub = '#6B7280'
+    green = '#059669'; red = '#DC2626'; blue = '#2563EB'
+    border = '#E5E7EB'
 
-    bg = '#0d1117'; fg = '#c9d1d9'; accent = '#58a6ff'; green = '#3fb950'; red = '#f85149'
-    card_bg = '#161b22'; border = '#30363d'
+    if sig == '买入': accent_c = green; accent_bg = '#ECFDF5'
+    elif sig == '卖出': accent_c = red; accent_bg = '#FEF2F2'
+    else: accent_c = '#6B7280'; accent_bg = '#F9FAFB'
+
+    # 6×10.5 inches, 适配 iPhone
+    fig = plt.figure(figsize=(6, 10.5), facecolor=bg)
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.0, 1.8, 3.0], hspace=0.3,
+                          left=0.06, right=0.94, top=0.98, bottom=0.02)
 
     # ── P1: 信号卡 ──
     ax = fig.add_subplot(gs[0])
-    ax.set_facecolor(bg)
-    ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
+    ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
-    # 信号圆点
-    if sig == '买入': dot_c = green; bg_c = '#1a3a2a'
-    elif sig == '卖出': dot_c = red; bg_c = '#3a1a1a'
-    else: dot_c = '#8b949e'; bg_c = '#1a1c20'
-
-    ax.add_patch(plt.Rectangle((0, 0), 10, 10, color=bg_c, zorder=0))
-    ax.add_patch(plt.Circle((1.8, 5), 0.45, color=dot_c, zorder=2))
-    ax.text(2.6, 5, sig, fontsize=28, fontweight='bold', color=dot_c, va='center')
-    ax.text(2.6, 3.2, r['date'].strftime('%Y年%m月%d日'), fontsize=12, color='#8b949e', va='center')
-    ax.text(0.3, 8.5, ETF_NAME, fontsize=14, color='#8b949e')
-    ax.text(0.3, 7.2, 'YH02', fontsize=11, color='#484f58')
-
-    # 价格和指标
-    ax.text(7.0, 8.5, '价格', fontsize=9, color='#8b949e', ha='right')
-    ax.text(7.0, 6.8, f'{price:.4f}', fontsize=22, fontweight='bold', color=fg, ha='right')
-    ax.text(7.0, 4.5, f'RSI {rsi:.0f}  BB {bb_pos:.0f}%  {trend}', fontsize=11, color='#8b949e', ha='right')
-    ax.text(7.0, 3.2, f'{lookback}日 {ret_lookback:+.1f}%', fontsize=13, color=green if ret_lookback>=0 else red, ha='right', fontweight='bold')
+    # 信号横条
+    ax.add_patch(plt.Rectangle((0, 2.5), 10, 5, color=accent_bg, zorder=0))
+    ax.add_patch(plt.Circle((1.5, 5), 0.4, color=accent_c, zorder=2))
+    ax.text(2.2, 5, sig, fontsize=30, fontweight='bold', color=accent_c, va='center')
+    ax.text(0.3, 8.8, ETF_NAME, fontsize=13, fontweight='bold', color=fg)
+    ax.text(0.3, 7.6, r['date'].strftime('%Y/%m/%d'), fontsize=11, color=sub)
+    ax.text(9.7, 8.5, f'{price:.3f}', fontsize=22, fontweight='bold', color=fg, ha='right')
+    ax.text(9.7, 7.3, f'RSI {rsi:.0f}  |  BB {bb_pos:.0f}%', fontsize=10, color=sub, ha='right')
+    ax.text(0.3, 1.5, f'{trend} · 近{lookback}日 {ret_lookback:+.1f}%', fontsize=10,
+            color=green if ret_lookback>=0 else red)
+    ax.text(9.7, 1.5, f'上轨{upper_acc:+.4f} 价{price_acc:+.4f}', fontsize=8, color=sub, ha='right')
 
     # ── P2: 净值曲线 ──
     ax = fig.add_subplot(gs[1])
-    ax.set_facecolor(card_bg)
-    ax.fill_between(range(len(nvs)), 1.0, nvs, alpha=0.15, color=green if nvs[-1]>=1 else red)
-    ax.plot(range(len(nvs)), nvs, color=fg, lw=2.0)
-    ax.scatter(len(nvs)-1, nvs[-1], color=green if nvs[-1]>=1 else red, s=40, zorder=5)
+    ax.set_facecolor(bg)
+    line_c = green if nvs[-1] >= 1 else red
+    ax.fill_between(range(len(nvs)), 1.0, nvs, alpha=0.1, color=line_c)
+    ax.plot(range(len(nvs)), nvs, color=line_c, lw=2.0)
+    ax.scatter(len(nvs)-1, nvs[-1], color=line_c, s=50, zorder=5)
     ax.axhline(y=1.0, color=border, lw=1, ls='--')
     ax.set_xlim(-0.5, len(nvs)-0.5)
     ymin = min(0.85, min(nvs)*0.98); ymax = max(1.15, max(nvs)*1.02)
     ax.set_ylim(ymin, ymax)
     if len(nvs) >= 2:
-        ax.set_xticks([0, len(nvs)//2, len(nvs)-1])
-        ax.set_xticklabels([dates[0], dates[len(dates)//2], dates[-1]], fontsize=8, color='#8b949e')
-    ax.tick_params(labelsize=8, colors='#8b949e', left=False)
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.3f}'))
+        step = max(1, len(dates)//4)
+        ticks = list(range(0, len(dates), step))
+        if len(dates)-1 not in ticks: ticks.append(len(dates)-1)
+        ax.set_xticks(ticks)
+        ax.set_xticklabels([dates[t] for t in ticks], fontsize=7, color=sub)
+    ax.tick_params(labelsize=7, colors=sub, left=False)
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.2f}'))
     for spine in ax.spines.values(): spine.set_color(border); spine.set_linewidth(0.5)
-    ax.grid(True, alpha=0.1, color=fg)
-    ax.set_title(f'{lookback}日净值', fontsize=11, color='#8b949e', loc='left', pad=4)
+    ax.grid(True, alpha=0.15, color=border)
+    ax.set_title(f'净值走势 ({lookback}日)', fontsize=11, fontweight='bold', color=fg, loc='left', pad=6)
 
     # ── P3: 月度收益看板 ──
     ax = fig.add_subplot(gs[2])
     ax.set_facecolor(card_bg)
-    ax.set_xlim(0, 12); ax.set_ylim(-1, len(monthly)); ax.axis('off')
+    ax.set_xlim(0, 10); ax.set_ylim(-0.5, len(monthly)+1.5); ax.axis('off')
 
-    ax.text(0, len(monthly), '月度收益', fontsize=11, color='#8b949e', va='bottom')
-    ax.text(12, len(monthly), 'YH02', fontsize=9, color='#484f58', ha='right', va='bottom')
+    # 标题行
+    ax.text(0, len(monthly)+1, '月度收益看板', fontsize=12, fontweight='bold', color=fg, va='bottom')
+    ax.text(10, len(monthly)+1, '策略 / 持有 / 超额', fontsize=8, color=sub, ha='right', va='bottom')
 
-    col_w = [3.0, 2.2, 2.2, 2.2, 2.2]  # 月份, 本策略, 买入持有, 超额
-    col_x = [0]
-    for w in col_w[:-1]: col_x.append(col_x[-1] + w)
+    # 列头
+    cols = [2.5, 2.0, 2.5, 3.0]  # 月份, 策略, 持有, 超额
+    cx = [0.5]
+    for w in cols[:-1]: cx.append(cx[-1] + w)
+    for j, (hdr, x) in enumerate(zip(['月份', '策略', '买入持有', '超额收益'], cx)):
+        ax.text(x, len(monthly), hdr, fontsize=7, color=sub)
 
-    headers = ['月份', '策略', '持有', '超额', '信号']
-    for j, (hdr, cx) in enumerate(zip(headers, col_x)):
-        ax.text(cx, len(monthly)-1, hdr, fontsize=8, color='#484f58', fontweight='bold')
+    # 买入持有
+    df_m = df.copy(); df_m['month'] = df_m['date'].dt.to_period('M')
+    bh_m = df_m.groupby('month').agg(bh_open=('close','first'), bh_close=('close','last'))
+    bh_m['bh_ret'] = (bh_m['bh_close'] / bh_m['bh_open'] - 1) * 100
+    bh_map = bh_m['bh_ret'].to_dict()
 
-    # 计算买入持有月度收益
-    df_m = df.copy()
-    df_m['month'] = df_m['date'].dt.to_period('M')
-    bh_monthly = df_m.groupby('month').agg(bh_open=('close','first'), bh_close=('close','last'))
-    bh_monthly['bh_ret'] = (bh_monthly['bh_close'] / bh_monthly['bh_open'] - 1) * 100
-    bh_map = bh_monthly['bh_ret'].to_dict()
-
+    row_h = 0.85
     for i, (m, row) in enumerate(monthly.iterrows()):
-        y_pos = len(monthly) - 2 - i
+        y = len(monthly) - 0.8 - i * row_h
         bh_ret = bh_map.get(m, 0)
         alpha_v = row['ret'] - bh_ret
-        # 背景条纹
+
+        # 斑马纹
         if i % 2 == 0:
-            ax.add_patch(plt.Rectangle((0, y_pos-0.35), 12, 0.7, color='#ffffff04', zorder=0))
+            ax.add_patch(plt.Rectangle((0.2, y - row_h/2 + 0.05), 9.6, row_h,
+                         color='#00000004', zorder=0))
 
-        ax.text(col_x[0], y_pos, str(m), fontsize=9, color=fg)
-        ax.text(col_x[1], y_pos, f'{row["ret"]:+.1f}%', fontsize=9,
-                color=green if row['ret']>=0 else red, fontweight='bold')
-        ax.text(col_x[2], y_pos, f'{bh_ret:+.1f}%', fontsize=8, color='#8b949e')
-        ax.text(col_x[3], y_pos, f'{alpha_v:+.1f}%', fontsize=8,
-                color=green if alpha_v>=0 else red)
-        # 信号摘要
-        sig_count = len(df[(df['date'].dt.to_period('M') == m)])
-        if row['ret'] > 2: s = '★'
-        elif row['ret'] > 0: s = '↑'
-        elif row['ret'] > -2: s = '—'
-        else: s = '↓'
-        ax.text(col_x[4], y_pos, s, fontsize=9, color=fg, ha='center')
+        ax.text(cx[0], y, str(m)[-7:], fontsize=8, color=fg)
+        ax.text(cx[1], y, f'{row["ret"]:+.1f}%', fontsize=9,
+                fontweight='bold', color=green if row['ret']>=0 else red)
+        ax.text(cx[2], y, f'{bh_ret:+.1f}%', fontsize=8, color=sub)
+        ax.text(cx[3], y, f'{alpha_v:+.1f}%', fontsize=8, color=green if alpha_v>=0 else red)
 
-    # 分割线
-    for spine in ax.spines.values(): spine.set_color(border); spine.set_linewidth(0.5)
+        # 右侧色条
+        bar_w = 0.3
+        if alpha_v > 0:
+            ax.add_patch(plt.Rectangle((9.5, y-row_h/3), bar_w, row_h*2/3, color=green, alpha=0.6))
+        elif alpha_v < 0:
+            ax.add_patch(plt.Rectangle((9.5, y-row_h/3), bar_w, row_h*2/3, color=red, alpha=0.4))
 
-    # 底部署名
-    fig.text(0.5, 0.01, 'YH02 · 自动生成 · 投资有风险', fontsize=7, color='#484f58',
-             ha='center', va='bottom')
+    # 边框
+    for spine in ax.spines.values(): spine.set_color(border); spine.set_linewidth(0.6)
+
+    fig.text(0.5, 0.005, 'YH02 · 每日自动生成', fontsize=7, color=sub, ha='center')
 
     buf = io.BytesIO()
     plt.savefig(buf, dpi=150, bbox_inches='tight', facecolor=bg, edgecolor='none')
@@ -220,9 +225,7 @@ def upload_chart(token, img_bytes):
     ur.urlopen(ur.Request(api, data=body, headers={**headers, 'Content-Type': 'application/json'}, method='PUT'),
                timeout=15, context=ctx)
 
-    ts = int(time.time())
-    # jsDelivr国内能访问, 加时间戳绕过缓存
-    return f'https://cdn.jsdelivr.net/gh/{REPO}@main/YH02/live_chart.png?t={ts}'
+    return f'https://cdn.jsdelivr.net/gh/{REPO}@main/YH02/live_chart.png'
 
 def send_bark(title, body, chart_url):
     """推送到手机Bark (带图片)"""
