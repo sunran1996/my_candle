@@ -178,6 +178,12 @@ def main():
 
         # 3. 上传 GitHub
         token = os.environ.get('GH_TOKEN', '')
+        if not token:
+            for p in ['../github_token.txt', 'github_token.txt', 'd:/策略/github_token.txt']:
+                try:
+                    token = open(p).read().strip()
+                    if token: break
+                except: pass
         chart_url = ''
         if token:
             print("上传图表...")
