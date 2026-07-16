@@ -102,21 +102,25 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     sig_bg    = { 'BUY': '#1C1113', 'SELL': '#0F1A12', 'HOLD': '#15171A' }[sig]
 
     fig = plt.figure(figsize=(6, 11), facecolor=BG)
-    gs = fig.add_gridspec(3, 1, height_ratios=[2.2, 2.0, 3.5], hspace=0.3,
-                          left=0.08, right=0.92, top=0.96, bottom=0.02)
+    # 渐变背景
+    grad = np.linspace(0, 1, 256).reshape(1, -1)
+    grad = np.vstack([grad, grad])
+    fig.figimage(grad, cmap=plt.cm.get_cmap('Greys'), alpha=0.03, zorder=-1)
+    gs = fig.add_gridspec(3, 1, height_ratios=[2.5, 2.0, 3.5], hspace=0.3,
+                          left=0.08, right=0.92, top=0.95, bottom=0.02)
 
     # ═══════ P1: HEADER ═══════
     ax = fig.add_subplot(gs[0]); ax.set_facecolor(BG)
     ax.set_xlim(0, 10); ax.set_ylim(0, 12); ax.axis('off')
 
-    # 标题行 (下移, 远离顶线)
+    # 顶部分割线 (在标题上方)
+    ax.axhline(y=11.8, color=GOLD, lw=1.0, xmin=0.0, xmax=1.0)
+
+    # 标题行
     ax.text(0.2, 11.2, ETF_NAME, fontsize=24, fontweight='bold', color=FG)
     ax.text(4.5, 11.2, ETF_SYMBOL.upper(), fontsize=11, color=SUB, va='baseline')
     ax.text(0.2, 10.4, r['date'].strftime('%Y.%m.%d'), fontsize=10, color=SUB)
     ax.text(0.2, 9.6, 'YH02  QUANT  STRATEGY', fontsize=7, color=SUB)
-
-    # 顶部分割线
-    ax.axhline(y=11.6, color=GOLD, lw=1.2, xmin=0.02, xmax=0.98)
 
     # 右侧: 价格大字
     price_c = UP if day_chg >= 0 else DN
@@ -124,11 +128,11 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.text(9.8, 10.2, f'{day_chg:+.2f}%', fontsize=11, color=price_c, ha='right')
 
     # 信号条
-    ax.add_patch(plt.Rectangle((0.2, 6.8), 9.6, 1.8, color=sig_bg, zorder=0))
-    ax.text(0.8, 7.7, sig, fontsize=11, fontweight='bold', color=sig_color,
+    ax.add_patch(plt.Rectangle((0.2, 6.5), 9.6, 1.8, color=sig_bg, zorder=0))
+    ax.text(0.8, 7.4, sig, fontsize=11, fontweight='bold', color=sig_color,
             family='monospace', va='center')
-    ax.text(2.8, 7.7, sig_cn, fontsize=14, fontweight='bold', color=sig_color, va='center')
-    ax.text(6.0, 7.7, f'RSI {rsi:.0f}    BB {bb_pos:.0f}%    {trend_cn}',
+    ax.text(2.8, 7.4, sig_cn, fontsize=14, fontweight='bold', color=sig_color, va='center')
+    ax.text(6.0, 7.4, f'RSI {rsi:.0f}    BB {bb_pos:.0f}%    {trend_cn}',
             fontsize=10, color=SUB, va='center', family='SimSun')
 
     # 指标网格 (2x4)
@@ -142,7 +146,7 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ]
     for idx, (label, value) in enumerate(metrics):
         col, row = idx % 2, idx // 2
-        mx = 0.5 + col * 5.0; my = 5.5 - row * 1.2
+        mx = 0.5 + col * 5.0; my = 5.5 - row * 1.6
         vc = UP if value.startswith('+') else (DN if value.startswith('-') else FG)
         ax.text(mx, my, label, fontsize=10, color=SUB, family='SimSun')
         ax.text(mx, my-0.55, value, fontsize=10, color=vc, fontweight='bold')
