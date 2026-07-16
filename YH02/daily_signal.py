@@ -294,7 +294,49 @@ def main():
         df['date'] = pd.to_datetime(df['date']); df = df.sort_values('date').reset_index(drop=True)
         df = compute_indicators(df)
 
-        # 2. 生成图表
+        # 检测是否交易日 (周末 + 数据太旧)
+        today = pd.Timestamp.now().normalize()
+        last_date = df['date'].iloc[-1].normalize()
+        is_weekend = today.dayofweek >= 5
+        data_stale = (today - last_date).days > 2
+
+        if is_weekend or data_stale:
+            # 非交易日: 推送前一日持仓摘要
+            r = df.iloc[-1]; prev = df.iloc[-2]
+            price = r['close']; rsi = r['rsi']
+            bb_pos = (r['adj_close'] - r['lower']) / (r['upper'] - r['lower']) * 100
+            bb_w = (r['upper'] - r['lower']) / r['ma'] * 100
+            expanding = bb_w > (prev['upper'] - prev['lower']) / prev['ma'] * 100
+            trend = '扩张' if expanding else '收缩'
+
+            bb_buy = r['adj_close'] <= r['lower']; bb_sell = r['adj_close'] >= r['upper']
+            rsi_buy = rsi <= RSI_OVERSOLD
+            upper_acc = r['upper_acc'] if not np.isnan(r['upper_acc']) else 0
+            price_acc = r['price_acc'] if not np.isnan(r['price_acc']) else 0
+
+            if expanding:
+                buy_ok = (bb_buy or rsi_buy)
+                sell_ok = (bb_sell and rsi >= EXPAND_RSI_SELL) and not ((upper_acc > BB_ACCEL_UP) and (price_acc > 0))
+            else:
+                buy_ok = (bb_buy or rsi_buy)
+                sell_ok = (bb_sell or rsi >= RSI_OVERBOUGHT)
+
+            if buy_ok and not sell_ok: sig = '买入'
+            elif sell_ok and not buy_ok: sig = '卖出'
+            else: sig = '持有'
+
+            reason = '周末休市' if is_weekend else '数据未更新(可能节假日)'
+            print(f"\n{reason} (最新: {r['date'].strftime('%Y-%m-%d')})")
+            print(f"信号: {sig}  价格: {price:.4f}  RSI: {rsi:.1f}  BB: {bb_pos:.0f}%  {trend}")
+
+            body = (f'{reason}\n'
+                    f'前次交易日: {r["date"].strftime("%m月%d日")}\n'
+                    f'持仓建议: {sig}\n'
+                    f'价格 {price:.4f}  RSI {rsi:.1f}  {trend}')
+            send_bark(f'{ETF_NAME} {reason} | {sig}', body, '')
+            return
+
+        # 2. 生成图表 (交易日)
         print("生成图表...")
         img_bytes, sig, price, rsi, bb_pos, trend, upper_acc, price_acc, ret_pct = gen_chart(df)
 
