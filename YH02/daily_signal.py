@@ -115,24 +115,25 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax = fig.add_subplot(gs[1])
     ax.set_facecolor(bg); ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis('off')
 
-    # 标题: 红利低波 + 代码
-    ax.text(0.3, 9.5, f'{ETF_NAME}', fontsize=22, fontweight='bold', color=fg)
-    ax.text(5.3, 9.5, ETF_SYMBOL, fontsize=10, color=sub, va='baseline')
+    # 标题
+    ax.text(0.3, 9.5, f'{ETF_NAME}({ETF_SYMBOL})', fontsize=22, fontweight='bold', color=fg)
     ax.text(0.3, 8.5, r['date'].strftime('%Y/%m/%d'), fontsize=10, color=sub)
 
-    # 信号: 小字号
-    ax.add_patch(plt.Rectangle((0, 4.2), 10, 3.2, color=accent_bg, zorder=0))
-    ax.add_patch(plt.Circle((1.2, 5.8), 0.3, color=accent_c, zorder=2))
-    ax.text(1.8, 5.8, sig, fontsize=18, fontweight='bold', color=accent_c, va='center')
-    ax.text(3.5, 5.8, f'RSI {rsi:.0f}  BB {bb_pos:.0f}%  {trend}', fontsize=10, color=sub, va='center')
-
-    # 价格 + BB轨道
+    # 价格 右侧
     ax.text(9.7, 9.2, f'{price:.3f}', fontsize=26, fontweight='bold', color=fg, ha='right')
-    ax.text(9.7, 8.2, f'上轨 {r["upper"]:.3f}', fontsize=11, color=sub, ha='right')
-    ax.text(9.7, 7.4, f'下轨 {r["lower"]:.3f}', fontsize=11, color=sub, ha='right')
-    ax.text(0.3, 2.2, f'近{lookback}日 {ret_lookback:+.1f}%', fontsize=11,
+
+    # 信号 — 独立区域
+    ax.add_patch(plt.Rectangle((0, 5.5), 10, 2.5, color=accent_bg, zorder=0))
+    ax.add_patch(plt.Circle((2.5, 6.75), 0.5, color=accent_c, zorder=2))
+    ax.text(3.5, 6.75, sig, fontsize=22, fontweight='bold', color=accent_c, va='center')
+
+    # RSI / BB / 趋势 / 加速度 — 集中在下方
+    info_y = 4.2
+    ax.text(0.5, info_y, f'RSI {rsi:.0f}    BB {bb_pos:.0f}%    {trend}', fontsize=11, color=fg)
+    ax.text(0.5, info_y-1.0, f'上轨 {r["upper"]:.3f}    下轨 {r["lower"]:.3f}', fontsize=10, color=sub)
+    ax.text(0.5, info_y-1.8, f'上轨加速 {upper_acc:+.4f}    价格加速 {price_acc:+.4f}', fontsize=9, color=sub)
+    ax.text(0.5, info_y-2.8, f'近{lookback}日 {ret_lookback:+.1f}%', fontsize=12,
             color=up_c if ret_lookback>=0 else down_c, fontweight='bold')
-    ax.text(9.7, 2.2, f'上轨加速{upper_acc:+.4f} 价加速{price_acc:+.4f}', fontsize=8, color=sub, ha='right')
 
     # ── P2: 净值曲线 ──
     ax = fig.add_subplot(gs[2])
