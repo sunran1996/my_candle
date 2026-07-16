@@ -121,12 +121,11 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     # 价格
     ax.text(9.7, 9.5, f'{price:.3f}', fontsize=24, fontweight='bold', color=fg, ha='right')
 
-    # 信号 — 大色块圆角风格
+    # 信号 — 纯黑大字, 简洁
     signal_box = plt.Rectangle((0.3, 6.5), 9.4, 1.5, color=accent_bg, zorder=0,
                                 linewidth=1, edgecolor=accent_c, linestyle='-')
     ax.add_patch(signal_box)
-    ax.add_patch(plt.Circle((1.5, 7.25), 0.35, color=accent_c, zorder=2))
-    ax.text(2.2, 7.25, sig, fontsize=18, fontweight='bold', color=accent_c, va='center')
+    ax.text(0.8, 7.25, sig, fontsize=21, fontweight='bold', color='#000000', va='center')
 
     # 指标信息 — 统一字体 + 统一颜色
     info_font = 10
