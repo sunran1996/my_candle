@@ -19,7 +19,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq fonts-wqy-zenhei
+          sudo apt-get install -y -qq fonts-wqy-zenhei fonts-wqy-microhei
       - name: Install python deps
         run: pip install akshare pandas numpy matplotlib
       - name: Run YH02 signal
