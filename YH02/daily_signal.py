@@ -249,19 +249,20 @@ def main():
         df = ak.fund_etf_hist_sina(symbol=ETF_SYMBOL)
         df['date'] = pd.to_datetime(df['date']); df = df.sort_values('date').reset_index(drop=True)
 
-        # 叠加实时行情
-        try:
-            spot = ak.fund_etf_spot_em()
-            spot = spot[spot['代码'] == '512890']
-            if len(spot) > 0:
-                rt_price = float(spot['最新价'].iloc[0])
-                rt_time = pd.Timestamp.now()
-                if rt_price > 0 and abs(rt_price - df['close'].iloc[-1]) / df['close'].iloc[-1] < 0.05:
-                    df.loc[df.index[-1], 'close'] = rt_price
-                    df.loc[df.index[-1], 'date'] = rt_time
-                    print(f"  实时价: {rt_price:.4f}")
-        except Exception as e:
-            print(f"  实时行情获取失败, 用收盘价: {e}")
+        # 叠加实时行情 (仅交易日)
+        is_weekend = pd.Timestamp.now().dayofweek >= 5
+        if not is_weekend:
+            try:
+                spot = ak.fund_etf_spot_em()
+                spot = spot[spot['代码'] == '512890']
+                if len(spot) > 0:
+                    rt_price = float(spot['最新价'].iloc[0])
+                    if rt_price > 0 and abs(rt_price - df['close'].iloc[-1]) / df['close'].iloc[-1] < 0.05:
+                        df.loc[df.index[-1], 'close'] = rt_price
+                        df.loc[df.index[-1], 'date'] = pd.Timestamp.now()
+                        print(f"  实时价: {rt_price:.4f}")
+            except Exception as e:
+                print(f"  实时行情获取失败, 用收盘价: {e}")
 
         df = compute_indicators(df)
 
