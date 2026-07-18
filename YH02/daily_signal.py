@@ -17,9 +17,15 @@ EXPAND_RSI_SELL = 65; BB_ACCEL_UP = 0.001
 BARK_KEY = 'eoq8G58fJtDDFxHjhNueGH'
 REPO = 'sunran1996/my_candle'
 
-# 字体
+# 跨平台字体
 _fonts = [f.name for f in fm.fontManager.ttflist]
-CN_SANS = 'WenQuanYi Zen Hei' if 'WenQuanYi Zen Hei' in _fonts else ('SimHei' if 'SimHei' in _fonts else 'DejaVu Sans')
+if 'WenQuanYi Zen Hei' in _fonts:
+    CN_SANS = 'WenQuanYi Zen Hei'; CN_SERIF = 'WenQuanYi Micro Hei'
+elif 'SimHei' in _fonts:
+    CN_SANS = 'SimHei'; CN_SERIF = 'SimSun'
+else:
+    CN_SANS = 'DejaVu Sans'; CN_SERIF = 'DejaVu Serif'
+EN_SERIF = 'Times New Roman' if 'Times New Roman' in _fonts else 'DejaVu Serif'
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = [CN_SANS, 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
@@ -123,8 +129,8 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     for idx, (label, value) in enumerate(metrics):
         c, rw = idx % 2, idx // 2
         mx = 0.5 + c * col_gap; my = info_y0 - rw * row_gap
-        ax.text(mx, my, f'{label}', fontsize=info_font, color=FG, family='SimSun')
-        ax.text(mx + 2.0, my, value, fontsize=info_font, color=FG, fontweight='bold', family='Times New Roman')
+        ax.text(mx, my, f'{label}', fontsize=info_font, color=FG, family=CN_SERIF)
+        ax.text(mx + 2.0, my, value, fontsize=info_font, color=FG, fontweight='bold', family=EN_SERIF)
 
     # 信号
     ax.add_patch(plt.Rectangle((0.3, 0.2), 9.4, 1.6, color='#FAD5D5' if sig == 'SELL' else ('#D5F0D8' if sig == 'BUY' else '#F0E8F0'), zorder=0))
