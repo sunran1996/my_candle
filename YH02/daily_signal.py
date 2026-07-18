@@ -255,31 +255,11 @@ def main():
         is_weekend = today.dayofweek >= 5
         data_stale = (today - last_date).days > 2
 
-        if is_weekend or data_stale:
-            r = df.iloc[-1]; prev = df.iloc[-2]
-            price = r['close']; rsi = r['rsi']
-            bb_pos = (r['adj_close'] - r['lower']) / (r['upper'] - r['lower']) * 100
-            expanding = (r['upper'] - r['lower']) / r['ma'] > (prev['upper'] - prev['lower']) / prev['ma']
-            upper_acc = r['upper_acc'] if not np.isnan(r['upper_acc']) else 0
-            price_acc = r['price_acc'] if not np.isnan(r['price_acc']) else 0
-            if expanding:
-                buy_ok = (r['adj_close'] <= r['lower'] or rsi <= RSI_OVERSOLD)
-                sell_ok = (r['adj_close'] >= r['upper'] and rsi >= EXPAND_RSI_SELL) and not (upper_acc > BB_ACCEL_UP and price_acc > 0)
-            else:
-                buy_ok = (r['adj_close'] <= r['lower'] or rsi <= RSI_OVERSOLD)
-                sell_ok = (r['adj_close'] >= r['upper'] or rsi >= RSI_OVERBOUGHT)
-            if buy_ok and not sell_ok: sig = '买入'
-            elif sell_ok and not buy_ok: sig = '卖出'
-            else: sig = '持有'
-
-            reason = '周末休市' if is_weekend else '数据未更新(可能节假日)'
-            print(f"\n{reason} (最新: {r['date'].strftime('%Y-%m-%d')})")
-            body = (f'{reason}\n'
-                    f'前次交易日: {r["date"].strftime("%m月%d日")}\n'
-                    f'持仓建议: {sig}\n'
-                    f'价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%')
-            send_bark(f'{ETF_NAME} {reason} | {sig}', body, '')
-            return
+        non_trading = is_weekend or data_stale
+        reason = ''
+        if non_trading:
+            reason = '周末休市' if is_weekend else '数据未更新'
+            print(f"\n{reason} (最新: {df['date'].iloc[-1].strftime('%Y-%m-%d')})")
 
         print("生成图表...")
         img_bytes, sig, price, rsi, bb_pos, trend, upper_acc, price_acc, ret_pct = gen_chart(df)
@@ -299,7 +279,8 @@ def main():
         else:
             print("无 GH_TOKEN, 跳过图表上传")
 
-        body = (f'价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%  {trend}\n'
+        prefix = f'{reason} · ' if non_trading else ''
+        body = (f'{prefix}价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%  {trend}\n'
                 f'近半年收益 {ret_pct:+.1f}%\n'
                 f'上轨加速度 {upper_acc:+.4f}  价格加速度 {price_acc:+.4f}')
         emoji = {'买入': '🟢', '卖出': '🔴'}.get(sig, '⚪')
