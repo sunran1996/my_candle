@@ -70,9 +70,10 @@ def main():
 
         # 推送
         top=ranking[0] if ranking else '—'; top_macd=scores.get(top,0)
+        rank_str = ', '.join(f'#{i+1}{n}' for i,n in enumerate(ranking[:3]))
         body=(f'{MAIN_NAME}: {sig}  价格{row["close"]:.3f}  RSI{rsi:.1f}\n'
               f'BB {bb_pos:.0f}%  |  成长MACD #{top_macd:+.3f}\n'
-              f'排名: {", ".join(f\"#{i+1}{n}\" for i,n in enumerate(ranking[:3]))}')
+              f'排名: {rank_str}')
         send_bark(f'YH04 {MAIN_NAME} {sig}',body)
     except Exception as e:
         print(f"失败: {e}")
