@@ -24,6 +24,7 @@ ETF_SYMBOL = 'sh512890'; ETF_NAME = '红利低波'
 BB_PERIOD = 45; BB_STD = 2.0
 RSI_PERIOD = 14; RSI_OVERSOLD = 30; RSI_OVERBOUGHT = 70
 EXPAND_RSI_SELL = 65       # 扩张时卖出RSI阈值(低于默认70, 趋势动能衰减即离场)
+HARD_STOP = 0.12           # 12%硬止损(黑天鹅保护, 历史从未触发)
 BB_ACCEL_UP = 0.001        # BB上轨加速度>此值=上涨加速中, 暂缓卖出
 DCA = 20000
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -59,6 +60,7 @@ def run_backtest(start_date_str):
     peak_nav = INITIAL_CAPITAL; nav = INITIAL_CAPITAL
     trades = []; nav_log = []; prev_price = None; last_month = None
     signal_count = 0; prev_bb_width = None
+    entry_price = df['close'].iloc[0]  # 持仓成本, 用于硬止损
 
     for i, row in df.iterrows():
         price = row['close']; d = row['date']; adj = row['adj_close']
@@ -74,8 +76,20 @@ def run_backtest(start_date_str):
         if dd < -0.08 and not reserve_active and reserve_pool > 0:
             cash += reserve_pool; reserve_pool = 0; reserve_active = True
 
+        # 硬止损: 股价较买入价跌超12% → 清仓
+        if (shares > 0 or reserve_shares > 0) and price < entry_price * (1 - HARD_STOP):
+            cash += (shares + reserve_shares) * price * (1 - COMMISSION - SLIPPAGE)
+            if reserve_active:
+                reserve_pool = reserve_shares * price * (1 - COMMISSION - SLIPPAGE)
+                cash -= reserve_pool; reserve_shares = 0; reserve_active = False
+            shares = 0; action = 'STOP'
+            nav = cash
+            trades.append({'date': d.strftime('%Y-%m-%d'), 'dir': 'STOP', 'price': round(price, 4),
+                          'nav': round(nav, 0), 'ret': round((nav/total_invested-1)*100, 2), 'type': '止损'})
+            nav_log.append({'date': d, 'nav': nav}); continue
+
         bb_buy = (adj <= lower); bb_sell = (adj >= upper)
-        rsi_buy = (rsi <= RSI_OVERSOLD)
+        rsi_buy = (rsi <= RSI_OVERSOLD); rsi_sell = (rsi >= RSI_OVERBOUGHT)
         bb_width = (upper - lower) / row['ma'] if row['ma'] > 0 else 0.1
         expanding = (prev_bb_width is not None and bb_width > prev_bb_width)
         if expanding:
@@ -83,11 +97,11 @@ def run_backtest(start_date_str):
             raw_sell = (bb_sell and rsi >= EXPAND_RSI_SELL)
             upper_acc = row['upper_acc'] if not np.isnan(row['upper_acc']) else 0
             price_acc = row['price_acc'] if not np.isnan(row['price_acc']) else 0
-            # BB加速+价格也在加速 → 趋势真实, 暂缓卖出
-            # BB加速但价格减速 → 趋势末端, 允许卖出
             blocked = (upper_acc > BB_ACCEL_UP) and (price_acc > 0)
             sell_sig = raw_sell and not blocked
         else:
+            buy_sig = (bb_buy or rsi_buy)
+            sell_sig = (bb_sell or rsi_sell)
             buy_sig = (bb_buy or rsi_buy)
             sell_sig = (bb_sell or (rsi >= RSI_OVERBOUGHT))
         prev_bb_width = bb_width
@@ -105,7 +119,7 @@ def run_backtest(start_date_str):
                     buy_type = 'RESERVE'
                 elif cash < nav * 0.1: shares += buy_shares; buy_type = 'DCA'
                 else:                   shares += buy_shares; buy_type = 'BUY'
-                cash = 0; action = 'BUY'
+                cash = 0; action = 'BUY'; entry_price = price
         elif sell_sig:
             if shares > 0 or reserve_shares > 0:
                 cash += (shares + reserve_shares) * price * (1 - COMMISSION - SLIPPAGE)
