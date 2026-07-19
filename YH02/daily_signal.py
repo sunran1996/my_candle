@@ -2,7 +2,7 @@
 """GitHub Actions 每日自动信号 — 高级量化看板 + 推送到手机Bark"""
 import sys, io, os, json, ssl, time, base64, warnings
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-import akshare as ak, pandas as pd, numpy as np
+import akshare as ak, pandas as pd, numpy as np; from data_feed import get_data
 import urllib.request as ur
 import matplotlib
 matplotlib.use('Agg')
@@ -252,8 +252,7 @@ def send_bark(title, body, chart_url):
 def main():
     try:
         print("获取数据...")
-        df = ak.fund_etf_hist_sina(symbol=ETF_SYMBOL)
-        df['date'] = pd.to_datetime(df['date']); df = df.sort_values('date').reset_index(drop=True)
+        df = get_data(ETF_SYMBOL)
 
         # 叠加实时行情 (仅交易日)
         is_weekend = pd.Timestamp.now().dayofweek >= 5
