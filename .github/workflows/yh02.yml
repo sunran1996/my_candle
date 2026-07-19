@@ -21,7 +21,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq fonts-wqy-zenhei fonts-wqy-microhei
       - name: Install python deps
-        run: pip install akshare pandas numpy matplotlib
+        run: pip install akshare baostock pandas numpy matplotlib
       - name: Run YH02 signal
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
