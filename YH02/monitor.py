@@ -9,7 +9,8 @@ Walk-Forward验证: OOS平均Sharpe=1.28, 最差1.01, 3/3窗口盈利
 """
 import sys, io, os, json, warnings, argparse
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-import akshare as ak, pandas as pd, numpy as np, matplotlib
+from data_feed import get_data
+import pandas as pd, numpy as np, matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
@@ -48,7 +49,7 @@ def compute_indicators(df):
 # ======================== 回测 ========================
 def run_backtest(start_date_str):
     start_date = pd.Timestamp(start_date_str)
-    df = ak.fund_etf_hist_sina(symbol=ETF_SYMBOL)
+    df = get_data(ETF_SYMBOL)
     df['date'] = pd.to_datetime(df['date']); df = df.sort_values('date')
     compute_indicators(df)
     df = df[df['date'] >= start_date].reset_index(drop=True)
@@ -177,8 +178,7 @@ def run_backtest(start_date_str):
 
 # ======================== 实时信号 ========================
 def live_signal():
-    df = ak.fund_etf_hist_sina(symbol=ETF_SYMBOL)
-    df['date'] = pd.to_datetime(df['date']); df = df.sort_values('date').reset_index(drop=True)
+    df = get_data(ETF_SYMBOL)
     compute_indicators(df)
 
     r = df.iloc[-1]; prev = df.iloc[-2]
