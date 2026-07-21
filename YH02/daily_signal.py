@@ -80,7 +80,8 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     nvs = (recent['nav'] / nav_start).tolist()
     dates = recent['date'].dt.strftime('%m/%d').tolist()
     ret_lookback = (nvs[-1] - 1) * 100
-    day_chg = (price - prev['close']) / prev['close'] * 100
+    # day_chg: 最新价 vs 前一日(考虑实时价更新)
+    day_chg = (r['close'] - df['close'].iloc[-2]) / df['close'].iloc[-2] * 100
     monthly = month_returns(df, 12)
 
     # ===== 主题 =====
