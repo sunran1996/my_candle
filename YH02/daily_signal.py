@@ -249,7 +249,6 @@ def send_bark(title, body, chart_url):
                        headers={'Content-Type': 'application/json'}), timeout=10)
         except Exception as e: pass
     print("已推送")
-        print(f"推送失败: {e}")
 
 def main():
     try:
