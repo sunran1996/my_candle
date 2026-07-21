@@ -9,7 +9,7 @@ warnings.filterwarnings('ignore')
 MAIN_SYM='sh512890'; MAIN_NAME='红利低波'
 GROWTH={'创业板':'sz159915','科创50':'sh588000','人工智能':'sh515070','半导体':'sh512480'}
 BB_P=45; BB_S=2.0; RSI_P=14; RSI_L=30; RSI_H=70; ERS=65
-BARK_KEY='eoq8G58fJtDDFxHjhNueGH'
+BARK_KEYS=['eoq8G58fJtDDFxHjhNueGH','WtAJhZtoGpU44fAiJCfJmb']
 
 def fetch():
     dfs={}
@@ -34,12 +34,13 @@ def add_growth(df):
     return df
 
 def send_bark(title,body):
-    try:
-        data=json.dumps({'title':title,'body':body}).encode()
-        ur.urlopen(ur.Request(f'https://api.day.app/{BARK_KEY}',data=data,
-                   headers={'Content-Type':'application/json'}),timeout=10)
-        print("已推送到手机")
-    except Exception as e: print(f"推送失败: {e}")
+    for bk in BARK_KEYS:
+        try:
+            data=json.dumps({'title':title,'body':body}).encode()
+            ur.urlopen(ur.Request(f'https://api.day.app/{bk}',data=data,
+                       headers={'Content-Type':'application/json'}),timeout=10)
+        except Exception as e: print(f"推送{bk[:8]}失败: {e}")
+    print("已推送")
 
 def main():
     try:
