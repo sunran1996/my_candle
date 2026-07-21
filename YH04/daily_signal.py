@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""YH04 每日自动信号 — 推送到手机Bark"""
+"""YH04 每日信号 — 主线+副线全状态推送"""
 import sys, io, os, json, ssl, time, base64, warnings
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 import akshare as ak, pandas as pd, numpy as np
@@ -49,14 +49,16 @@ def main():
         idx=-1; pos=len(df_main)+idx; row=df_main.iloc[pos]; date=row['date']
         adj,rsi,lo,up=row['adj'],row['rsi'],row['lo'],row['up']
         bb_pos=(adj-lo)/(up-lo)*100 if up>lo else 50
-        bb_buy=adj<=lo; bb_sell=adj>=up; rsi_buy=rsi<=RSI_L
-        # 简化判断
-        buy_ok=bb_buy or rsi_buy; sell_ok=bb_sell and rsi>=ERS
-        if buy_ok: sig='买入'
-        elif sell_ok: sig='卖出'
-        else: sig='持有'
 
-        # 成长排名
+        # YH02主线信号
+        bb_buy=adj<=lo; bb_sell=adj>=up; rsi_buy=rsi<=RSI_L
+        buy_ok=bb_buy or rsi_buy
+        sell_ok=(bb_sell and rsi>=ERS)  # simplified expansion check
+        if buy_ok: main_sig='买入'
+        elif sell_ok: main_sig='卖出'
+        else: main_sig='持有'
+
+        # 成长MACD排名
         g_idx=max(len(d) for d in dfs_g.values())-1
         scores={}
         for n in GROWTH:
@@ -64,19 +66,54 @@ def main():
             v=dfs_g[n]['macd_h'].iloc[p2]
             if not pd.isna(v): scores[n]=v
         ranking=sorted(scores,key=scores.get,reverse=True)
+        leader=ranking[0] if ranking else '—'
+        leader_macd=scores.get(leader,0)
 
-        print(f"\n{MAIN_NAME}: {sig}  价格{row['close']:.3f}  RSI{rsi:.1f}  BB{bb_pos:.0f}%")
-        print(f"成长MACD排名: {', '.join(f'{n}({scores[n]:.3f})' for n in ranking[:4])}")
+        # 判断当前状态
+        main_px=raw[MAIN_NAME]['close'].iloc[len(raw[MAIN_NAME])+idx]
+        leader_px=raw[leader]['close'].iloc[min(len(raw[leader])-1,g_idx)] if leader!='—' else 0
+
+        if main_sig in ('买入','持有'):
+            state=f'满仓{MAIN_NAME}'
+            suggest=f'{main_sig}{MAIN_NAME} @{main_px:.3f}'
+            sub_info=f'副线待命 | 成长MACD #{leader_macd:+.3f} ({leader})'
+        elif main_sig=='卖出':
+            if leader_macd>0:
+                state=f'现金→可追{leader}'
+                suggest=f'主线卖出 | 副线MACD>0 → 可买入{leader} @{leader_px:.3f}'
+                sub_info=f'{leader} MACD {leader_macd:+.3f}  动量{dfs_g[leader]["mom"].iloc[g_idx]:+.1%}'
+            else:
+                state='现金等待'
+                suggest=f'{MAIN_NAME}已卖出 | 成长MACD全负({leader_macd:+.3f}) | 等翻红'
+                sub_info=f'四指数MACD全负, 暂不进场'
+        else:
+            state='—'; suggest='—'; sub_info='—'
+
+        # 终端输出
+        print(f"\n{'='*60}")
+        print(f"  YH04  {date.strftime('%Y-%m-%d')}  状态: {state}")
+        print(f"{'='*60}")
+        print(f"  主线 {MAIN_NAME}: {main_sig}  价格{main_px:.3f}  RSI{rsi:.1f}  BB{bb_pos:.0f}%")
+        print(f"  建议: {suggest}")
+        print(f"  {sub_info}")
+        print(f"{'─'*60}")
+        print(f"  成长MACD排名:")
+        for i,n in enumerate(ranking[:4]):
+            p=raw[n]['close'].iloc[min(len(raw[n])-1,g_idx)]
+            m=dfs_g[n]['mom'].iloc[min(len(dfs_g[n])-1,g_idx)]
+            macd=scores.get(n,0)
+            tag='  ← 触发' if (main_sig=='卖出' and i==0 and macd>0) else ''
+            print(f"    #{i+1} {n:<6} {p:.3f}  动量{m:+.1%}  MACD{macd:+.3f}{tag}")
+        print(f"{'='*60}")
 
         # 推送
-        top=ranking[0] if ranking else '—'; top_macd=scores.get(top,0)
-        rank_str = ', '.join(f'#{i+1}{n}' for i,n in enumerate(ranking[:3]))
-        body=(f'{MAIN_NAME}: {sig}  价格{row["close"]:.3f}  RSI{rsi:.1f}\n'
-              f'BB {bb_pos:.0f}%  |  成长MACD #{top_macd:+.3f}\n'
-              f'排名: {rank_str}')
-        send_bark(f'YH04 {MAIN_NAME} {sig}',body)
+        emoji={'买入':'🔴','卖出':'🟢','持有':'⚪'}.get(main_sig,'⚪')
+        body=(f'{emoji} {MAIN_NAME}: {main_sig}  价格{main_px:.3f}  RSI{rsi:.1f}\n'
+              f'状态: {state}\n'
+              f'{suggest}\n'
+              f'{sub_info}')
+        send_bark(f'YH04 {state[:12]}',body)
     except Exception as e:
-        print(f"失败: {e}")
-        send_bark('YH04 信号失败',str(e)[:200])
+        print(f"失败: {e}"); send_bark('YH04 信号失败',str(e)[:200])
 
 if __name__=='__main__': main()
