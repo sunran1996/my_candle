@@ -73,19 +73,25 @@ def main():
         main_px=raw[MAIN_NAME]['close'].iloc[len(raw[MAIN_NAME])+idx]
         leader_px=raw[leader]['close'].iloc[min(len(raw[leader])-1,g_idx)] if leader!='—' else 0
 
-        if main_sig in ('买入','持有'):
+        # 判断持仓状态(简化: 主线信号=买入/持有→满仓红利; 卖出+MACD>0→应持成长)
+        holding_growth = (main_sig=='卖出' and leader_macd>0)  # 此时应已买入成长
+        holding_main   = main_sig in ('买入','持有')           # 满仓红利
+        holding_cash   = (main_sig=='卖出' and leader_macd<=0) # 现金等待
+
+        if holding_main:
             state=f'🔵 满仓{MAIN_NAME}'
-            suggest=f'{main_sig}{MAIN_NAME} @{main_px:.3f}'
+            suggest=f'持仓{MAIN_NAME} @{main_px:.3f}'
             sub_info=f'副线待命 | 最强{leader} MACD{leader_macd:+.3f}'
-        elif main_sig=='卖出':
-            if leader_macd>0:
-                state=f'🟢 买入{leader}'
-                suggest=f'主线{MAIN_NAME}已卖出 → 买入{leader} @{leader_px:.3f} | 移动止损-10%'
-                sub_info=f'MACD{leader_macd:+.3f} 动量{dfs_g[leader]["mom"].iloc[g_idx]:+.1%}'
-            else:
-                state=f'🔴 现金等待'
-                suggest=f'{MAIN_NAME}已卖出 | 四指数MACD全负({leader_macd:+.3f}) | 持币观望'
-                sub_info=f'等任一MACD翻红再进场'
+        elif holding_growth:
+            # 已持有创业板/其他成长标的
+            state=f'🟡 持仓{leader}'
+            stop_px = leader_px * 0.9  # 10%移动止损
+            suggest=f'持仓{leader} @{leader_px:.3f} | 止损线 {stop_px:.3f} | 主线{MAIN_NAME}信号{main_sig}'
+            sub_info=f'MACD{leader_macd:+.3f} 动量{dfs_g[leader]["mom"].iloc[g_idx]:+.1%} | 等主线买入信号切回'
+        elif holding_cash:
+            state=f'🔴 现金等待'
+            suggest=f'{MAIN_NAME}已卖出 | MACD全负({leader_macd:+.3f}) | 持币观望'
+            sub_info=f'等任一MACD翻红进场'
         else:
             state='—'; suggest='—'; sub_info='—'
 
