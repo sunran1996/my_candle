@@ -74,18 +74,18 @@ def main():
         leader_px=raw[leader]['close'].iloc[min(len(raw[leader])-1,g_idx)] if leader!='—' else 0
 
         if main_sig in ('买入','持有'):
-            state=f'满仓{MAIN_NAME}'
+            state=f'🔵 满仓{MAIN_NAME}'
             suggest=f'{main_sig}{MAIN_NAME} @{main_px:.3f}'
-            sub_info=f'副线待命 | 成长MACD #{leader_macd:+.3f} ({leader})'
+            sub_info=f'副线待命 | 最强{leader} MACD{leader_macd:+.3f}'
         elif main_sig=='卖出':
             if leader_macd>0:
-                state=f'现金→可追{leader}'
-                suggest=f'主线卖出 | 副线MACD>0 → 可买入{leader} @{leader_px:.3f}'
-                sub_info=f'{leader} MACD {leader_macd:+.3f}  动量{dfs_g[leader]["mom"].iloc[g_idx]:+.1%}'
+                state=f'🟢 买入{leader}'
+                suggest=f'主线{MAIN_NAME}已卖出 → 买入{leader} @{leader_px:.3f} | 移动止损-10%'
+                sub_info=f'MACD{leader_macd:+.3f} 动量{dfs_g[leader]["mom"].iloc[g_idx]:+.1%}'
             else:
-                state='现金等待'
-                suggest=f'{MAIN_NAME}已卖出 | 成长MACD全负({leader_macd:+.3f}) | 等翻红'
-                sub_info=f'四指数MACD全负, 暂不进场'
+                state=f'🔴 现金等待'
+                suggest=f'{MAIN_NAME}已卖出 | 四指数MACD全负({leader_macd:+.3f}) | 持币观望'
+                sub_info=f'等任一MACD翻红再进场'
         else:
             state='—'; suggest='—'; sub_info='—'
 
