@@ -14,7 +14,7 @@ ETF_SYMBOL = 'sh512890'; ETF_NAME = '红利低波'
 BB_PERIOD = 45; BB_STD = 2.0
 RSI_PERIOD = 14; RSI_OVERSOLD = 30; RSI_OVERBOUGHT = 70
 EXPAND_RSI_SELL = 65; BB_ACCEL_UP = 0.001
-BARK_KEY = 'eoq8G58fJtDDFxHjhNueGH'
+BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH','WtAJhZtoGpU44fAiJCfJmb']
 REPO = 'sunran1996/my_candle'
 
 # 跨平台字体
@@ -242,12 +242,13 @@ def upload_chart(token, img_bytes):
     return f'https://cdn.jsdelivr.net/gh/{REPO}@main/YH02/{filename}'
 
 def send_bark(title, body, chart_url):
-    data = json.dumps({'title': title, 'body': body, 'url': chart_url}).encode()
-    try:
-        ur.urlopen(ur.Request(f'https://api.day.app/{BARK_KEY}', data=data,
-                   headers={'Content-Type': 'application/json'}), timeout=10)
-        print("已推送到手机")
-    except Exception as e:
+    for bk in BARK_KEYS:
+        try:
+            data = json.dumps({'title': title, 'body': body, 'url': chart_url}).encode()
+            ur.urlopen(ur.Request(f'https://api.day.app/{bk}', data=data,
+                       headers={'Content-Type': 'application/json'}), timeout=10)
+        except Exception as e: pass
+    print("已推送")
         print(f"推送失败: {e}")
 
 def main():
