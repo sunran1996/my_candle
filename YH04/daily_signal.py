@@ -86,18 +86,30 @@ def main():
         leader_macd=scores.get(leader,0)
         leader_px=raw[leader]['close'].iloc[min(len(raw[leader])-1,g_idx)] if leader!='—' else 0
 
-        # 三指令
+        # 预警
+        warn=''
+        near_buy = (bb_pos<30 or rsi<40) and not buy_ok
+        near_sell = (bb_pos>70 and rsi>55) and not sell_ok
+        if near_sell: warn=f' ⚠ 接近卖出(RSI{rsi:.0f} BB{bb_pos:.0f}%)'
+        elif near_buy: warn=f' ⚠ 接近买入(RSI{rsi:.0f} BB{bb_pos:.0f}%)'
+
+        # 状态判断: sell_ok=true表示主线已卖出, 此时若leader_macd>0则应在创业板
         if buy_ok:
-            action=f'买入红利低波'
-            detail=f'全仓{MAIN_NAME} @{main_px:.3f} | RSI{rsi:.1f} BB{bb_pos:.0f}%'
+            action=f'🔴 买入红利低波'
+            detail=f'全仓{MAIN_NAME} @{main_px:.3f} | RSI{rsi:.1f} BB{bb_pos:.0f}% | 清创业板归队'
         elif sell_ok and leader_macd>0:
-            action=f'换仓{leader}'
+            action=f'🟢 换仓{leader}'
             detail=f'卖{MAIN_NAME}@{main_px:.3f} → 买{leader}@{leader_px:.3f} | 止损-10% | MACD{leader_macd:+.3f}'
+        elif not sell_ok and not buy_ok and leader_macd>0:
+            # 持有状态: 主线HOLD + 成长MACD>0 → 上次卖出后应已买入创业板
+            stop_px = leader_px * 0.9
+            action=f'🟡 持有{leader}'
+            detail=f'{leader}@{leader_px:.3f} | 止损线{stop_px:.3f} | MACD{leader_macd:+.3f} | 等主线买入切回'
         elif sell_ok:
-            action=f'卖出红利低波,持币'
+            action=f'⚫ 卖出红利低波,持币'
             detail=f'卖{MAIN_NAME}@{main_px:.3f} | MACD全负 | 等翻红再进场'
         else:
-            action=f'不动'
+            action=f'⚪ 持有红利低波{warn}'
             detail=f'{MAIN_NAME}@{main_px:.3f} RSI{rsi:.1f} BB{bb_pos:.0f}% | 副线{leader} MACD{leader_macd:+.3f}{" 翻红可追" if leader_macd>0 else ""}'
 
         sub_rank=' > '.join(f'{n}({scores[n]:+.3f})' for n in ranking[:3])
@@ -116,6 +128,7 @@ def main():
         print(f"{'='*60}")
 
         body=(f'{action}\n{detail}\n副线: {sub_rank}')
+        if warn: body+=f'\n{warn}'
         # send_bark(f'YH04 {action}',body)  # debug: 暂停推送
     except Exception as e:
         print(f"失败: {e}")  # send_bark暂停
