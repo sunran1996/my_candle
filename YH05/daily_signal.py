@@ -194,7 +194,7 @@ def gen_chart(raw,df_main,dfs_g,both=False):
 
     # A股配色: 红涨绿跌
     cn_colors=mpf.make_marketcolors(up='#CC0000',down='#008800',edge='inherit',wick='inherit',volume='inherit')
-    cn_style=mpf.make_mpf_style(marketcolors=cn_colors,gridstyle='')
+    cn_style=mpf.make_mpf_style(marketcolors=cn_colors,gridstyle='',rc={'font.sans-serif':[CN,'DejaVu Sans'],'axes.unicode_minus':False})
 
     # P1: 红利低波K线(红)
     ax1=fig.add_subplot(gs[1])
