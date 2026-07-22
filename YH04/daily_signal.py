@@ -13,11 +13,12 @@ warnings.filterwarnings('ignore')
 _fonts=[f.name for f in fm.fontManager.ttflist]
 CN='WenQuanYi Zen Hei' if 'WenQuanYi Zen Hei' in _fonts else ('SimHei'if'SimHei'in _fonts else'DejaVu Sans')
 plt.rcParams['font.sans-serif']=[CN]; plt.rcParams['axes.unicode_minus']=False
+# mplfinance字体通过make_mpf_style的rc参数配置
 
 MAIN_SYM='sh512890'; MAIN_NAME='红利低波'
 GROWTH={'创业板':'sz159915','科创50':'sh588000','人工智能':'sh515070','半导体':'sh512480'}
 BB_P=45;BB_S=2.0;RSI_P=14;RSI_L=30;RSI_H=70;ERS=65;BA=0.001
-BARK_KEYS=['eoq8G58fJtDDFxHjhNueGH','WtAJhZtoGpU44fAiJCfJmb']
+BARK_KEYS=['eoq8G58fJtDDFxHjhNueGH']  # 单推送防重复
 REPO='sunran1996/my_candle'
 
 def fetch():
@@ -114,7 +115,7 @@ def main():
         # ===== K线图(动态) =====
         lookback=120
         cn_c=mpf.make_marketcolors(up='#CC0000',down='#008800',edge='inherit',wick='inherit',volume='inherit')
-        cn_s=mpf.make_mpf_style(marketcolors=cn_c,gridstyle='')
+        cn_s=mpf.make_mpf_style(marketcolors=cn_c,gridstyle='',rc={'font.sans-serif':[CN],'axes.unicode_minus':False})
 
         # 判断画哪个标的
         if sell_ok and leader_macd>0 and leader in raw:
