@@ -16,6 +16,6 @@
 #      - name: Install deps
 #        run: |
 #          sudo apt-get install -y -qq fonts-wqy-zenhei fonts-wqy-microhei
-#          pip install akshare pandas numpy
+#          pip install akshare pandas numpy mplfinance
 #      - name: Run YH04 signal
 #        run: python YH04/daily_signal.py
