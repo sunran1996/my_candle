@@ -33,7 +33,7 @@ def fetch_akshare(symbol):
     import akshare as ak
     df = ak.fund_etf_hist_sina(symbol=symbol)
     df['date'] = pd.to_datetime(df['date'])
-    return df[['date', 'close']].sort_values('date').reset_index(drop=True)
+    return df[['date','open','high','low','close','volume']].sort_values('date').reset_index(drop=True) if 'open' in df.columns else df[['date','close']].sort_values('date').reset_index(drop=True)
 
 
 def fetch_baostock(symbol):
@@ -53,7 +53,7 @@ def fetch_baostock(symbol):
         raise Exception('baostock returned empty')
     df = pd.DataFrame(rows, columns=['date', 'close']).astype({'close': float})
     df['date'] = pd.to_datetime(df['date'])
-    return df[['date', 'close']].sort_values('date').reset_index(drop=True)
+    return df[['date','open','high','low','close','volume']].sort_values('date').reset_index(drop=True) if 'open' in df.columns else df[['date','close']].sort_values('date').reset_index(drop=True)
 
 
 def get_data(symbol='sh512890', force_refresh=False):
