@@ -110,30 +110,49 @@ def main():
 
         sub_rank=' > '.join(f'{n}({scores[n]:+.3f})'for n in ranking[:3])
 
-        # ===== K线图 =====
+        # ===== K线图(动态) =====
         lookback=120
-        ohlc=raw[MAIN_NAME].tail(lookback).copy()
-        ohlc=ohlc.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
-        ohlc=ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
         cn_c=mpf.make_marketcolors(up='#CC0000',down='#008800',edge='inherit',wick='inherit',volume='inherit')
         cn_s=mpf.make_mpf_style(marketcolors=cn_c,gridstyle='')
 
-        # 迷你回测净值
-        adj_hist=df_main['adj'].tail(lookback).values; adj_hist=adj_hist/adj_hist[0]
+        # 判断画哪个标的
+        if sell_ok and leader_macd>0 and leader in raw:
+            # 持有成长: 画创业板K线+MACD
+            plot_name=leader; plot_raw=raw[leader]
+            ohlc=plot_raw.tail(lookback).copy()
+            ohlc=ohlc.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
+            ohlc=ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
+            # MACD数据
+            g_df=dfs_g[leader].tail(lookback)
+            macd_data=g_df['macd_h'].values; macd_line=g_df['macd_line'].values
+            macd_sig=g_df['macd_s'].values if'macd_s'in g_df.columns else macd_line
+            ap_macd=mpf.make_addplot(macd_line,panel=1,color='#CC2222',width=1.2,ylabel='MACD')
+            ap_hist=mpf.make_addplot(macd_data,panel=1,type='bar',color='#CC2222',alpha=0.5)
+            ap_zero=mpf.make_addplot(np.zeros(len(macd_data)),panel=1,color='#888',width=0.5)
+            panels=dict(panel_ratios=(2,1))
+            fig,axes=mpf.plot(ohlc,type='candle',volume=False,style=cn_s,addplot=[ap_macd,ap_hist,ap_zero],
+                              returnfig=True,figsize=(6,8),panel_ratios=(2,1))
+            axes[0].set_title(f'{plot_name} MACD{leader_macd:+.3f}',fontsize=10,loc='left',color='#9B59B6')
+            axes[0].tick_params(labelsize=7); axes[0].grid(True,alpha=0.12)
+            fig.suptitle(f'YH04 {date.strftime("%Y-%m-%d")}  {action}',fontsize=13,fontweight='bold',y=0.98)
+        else:
+            # 持有红利低波: 画K线+BB双轨
+            ohlc=raw[MAIN_NAME].tail(lookback).copy()
+            ohlc=ohlc.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
+            ohlc=ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
+            # BB轨道
+            bb_adj=df_main['adj'].tail(lookback).values
+            bb_ma=df_main['ma'].tail(lookback).values; bb_up=df_main['up'].tail(lookback).values; bb_lo=df_main['lo'].tail(lookback).values
+            ap_ma=mpf.make_addplot(bb_ma,color='#888',width=0.8,linestyle='--')
+            ap_up=mpf.make_addplot(bb_up,color='#9B59B6',width=0.6,linestyle='--')
+            ap_lo=mpf.make_addplot(bb_lo,color='#9B59B6',width=0.6,linestyle='--')
+            fig,axes=mpf.plot(ohlc,type='candle',volume=False,style=cn_s,addplot=[ap_ma,ap_up,ap_lo],
+                              returnfig=True,figsize=(6,8))
+            axes[0].set_title(f'{MAIN_NAME} RSI{rsi:.0f} BB{bb_pos:.0f}%',fontsize=10,loc='left',color='#CC2222')
+            axes[0].tick_params(labelsize=7); axes[0].grid(True,alpha=0.12)
+            fig.suptitle(f'YH04 {date.strftime("%Y-%m-%d")}  {action}',fontsize=13,fontweight='bold',y=0.98)
 
-        fig=plt.figure(figsize=(6,9),facecolor='#FAFAFA')
-        gs=fig.add_gridspec(2,1,height_ratios=[2.5,1.2],hspace=0.2,left=0.06,right=0.94,top=0.95,bottom=0.03)
-        ax0=fig.add_subplot(gs[0]); ax0.axis('off')
-        ax0.text(0,0.9,f'YH04 {date.strftime("%Y-%m-%d")}',fontsize=14,fontweight='bold',color='#1A1A1A')
-        ax0.text(0,0.5,f'{action}',fontsize=15,fontweight='bold',color='#E67E22'if warn else'#1A1A1A')
-        ax0.text(0,0.15,f'{detail}',fontsize=10,color='#555')
-        ax0.text(0,0.0,f'副线: {sub_rank}',fontsize=9,color='#888')
-        ax1=fig.add_subplot(gs[1])
-        mpf.plot(ohlc,type='candle',ax=ax1,volume=False,style=cn_s)
-        ax1.set_title(f'{MAIN_NAME} RSI{rsi:.0f} BB{bb_pos:.0f}% | 净值{(adj_hist[-1]-1)*100:+.1f}%',fontsize=10,loc='left',color='#CC2222')
-        ax1.tick_params(labelsize=7); ax1.grid(True,alpha=0.12)
-
-        buf=io.BytesIO(); plt.savefig(buf,dpi=150,bbox_inches='tight',facecolor='#FAFAFA'); plt.close()
+        buf=io.BytesIO(); fig.savefig(buf,dpi=150,bbox_inches='tight',facecolor='#FAFAFA'); plt.close(fig)
         img_bytes=buf.getvalue()
 
         # 上传 + 推送
