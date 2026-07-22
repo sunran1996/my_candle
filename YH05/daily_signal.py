@@ -96,29 +96,153 @@ def gen_chart(raw,df_main,dfs_g,both=False):
     else:
         sub_state=f'⚪ 红利低波@{main_px:.3f} | 创业板MACD{macd_v:+.3f}'
 
-    # ===== 画图 =====
-    fig=plt.figure(figsize=(12,10),facecolor='#FAFAFA')
+    # ===== 120日迷你回测 =====
+    lookback=120
+    # 截取近120日数据
+    main_sub=df_main.tail(lookback).reset_index(drop=True)
+    cy_sub=dfs_g['创业板'].tail(lookback).reset_index(drop=True)
+    main_close=raw[MAIN_NAME]['close'].tail(lookback).reset_index(drop=True)
+    cy_close=raw['创业板']['close'].tail(lookback).reset_index(drop=True)
 
-    # 顶部信息栏
-    ax_info=fig.add_axes([0.05,0.88,0.9,0.10]); ax_info.axis('off')
-    ax_info.text(0,0.7,f'YH05 {r["date"].strftime("%Y-%m-%d")}',fontsize=14,fontweight='bold',color='#1A1A1A')
-    ax_info.text(0,0.2,f'{main_sig}{warn} | {sub_state}',fontsize=12,color='#E67E22' if warn else '#555')
+    INIT=1_000_000; cash=0.0; shares_main=INIT/main_close.iloc[0]*(1-0.0003)
+    shares_cy=0.0; pos='MAIN'; peak=INIT; pbw=None; sc=2; ep=main_close.iloc[0]
+    hse=0; last_rb=None; stopped=False; navs=[]; events=[]  # events记录换仓时间
 
-    # 红利低波K线(上)
-    ax1=fig.add_axes([0.05,0.48,0.9,0.37])
-    mpf.plot(main,type='candle',ax=ax1,volume=False,style='charles')
-    ax1.set_title(f'{MAIN_NAME}  RSI{rsi:.1f}  BB{bb_pos:.0f}%',fontsize=10,loc='left',color='#9B59B6')
+    for i in range(lookback):
+        mp=main_close.iloc[i]; cp=cy_close.iloc[i]
+        row=main_sub.iloc[i]; crow=cy_sub.iloc[i]
+        adj=row['adj']; rsi=row['rsi']; lo=row['lo']; up=row['up']
+
+        nav=cash+shares_main*mp+shares_cy*cp
+        if nav>peak: peak=nav
+        dd=(nav-peak)/peak if peak>0 else 0
+        if dd<-0.13 and (shares_main>0 or shares_cy>0):
+            cash+=(shares_main*mp+shares_cy*cp)*(1-0.0003); shares_main=0; shares_cy=0
+            peak=nav; pos=None; stopped=True
+
+        if pd.isna(lo) or pd.isna(rsi): navs.append(nav); continue
+
+        bw=(up-lo)/row['ma']if row['ma']>0 else 0.1
+        exp=(pbw is not None and bw>pbw); pbw=bw
+        bb_buy=(adj<=lo); bb_sell=(adj>=up); rsi_buy=(rsi<=30)
+        if exp:
+            sell_ok=(bb_sell and rsi>=65); buy_ok=(bb_buy or rsi_buy)
+        else: buy_ok=(bb_buy or rsi_buy); sell_ok=(bb_sell or rsi>=70)
+
+        if buy_ok or sell_ok: sc+=1
+        if sc<2: navs.append(nav); continue
+
+        if buy_ok and pos!='MAIN':
+            if pos=='CY':
+                cash+=shares_cy*cp*(1-0.0003); shares_cy=0
+                events.append((i,'SELL_CY'))
+            cash=max(cash,0); shares_main=cash/mp*(1-0.0003); cash=0; pos='MAIN'; ep=mp; stopped=False
+            events.append((i,'BUY_MAIN'))
+        elif sell_ok and pos=='MAIN':
+            cash+=shares_main*mp*(1-0.0003); shares_main=0; pos=None
+            events.append((i,'SELL_MAIN'))
+        elif pos is None and not stopped:
+            macd_ok=crow['macd_h']>0; bull_ok=cp>crow['ma20']
+            days_since=(i-last_rb)if last_rb else 999
+            if days_since>=5 and macd_ok and bull_ok:
+                above_zero=crow['macd_line']>0; pos_pct=1.0 if above_zero else 0.3
+                val=min(cash,nav*pos_pct)
+                if val>100: shares_cy=val/cp*(1-0.0003); cash-=val; pos='CY'; hse=cp
+                events.append((i,'BUY_CY'))
+                last_rb=i
+        elif pos=='CY':
+            if cp>hse: hse=cp
+            if cp<hse*0.9:
+                cash+=shares_cy*cp*(1-0.0003); shares_cy=0; pos=None; stopped=True
+                events.append((i,'STOP_CY'))
+
+        navs.append(cash+shares_main*mp+shares_cy*cp)
+
+    navs=np.array(navs); navs=navs/navs[0]
+
+    # 打印交易明细
+    print(f"\n  {'日期':<12} {'标的':<8} {'方向':<6} {'价格':>8} {'盈亏':>8}")
+    entry_main=None; entry_cy=None
+    for ei,etype in events:
+        if etype=='BUY_MAIN':
+            entry_main=(ei,main_close.iloc[ei])
+            print(f"  {main_sub['date'].iloc[ei].strftime('%m-%d'):<12} {MAIN_NAME:<8} 买入   {main_close.iloc[ei]:>8.3f}  {'—':>8}")
+        elif etype=='SELL_MAIN' and entry_main:
+            pnl=(main_close.iloc[ei]/entry_main[1]-1)*100
+            print(f"  {main_sub['date'].iloc[ei].strftime('%m-%d'):<12} {MAIN_NAME:<8} 卖出   {main_close.iloc[ei]:>8.3f}  {pnl:>+7.1f}%")
+            entry_main=None
+        elif etype=='BUY_CY':
+            entry_cy=(ei,cy_close.iloc[ei])
+            print(f"  {main_sub['date'].iloc[ei].strftime('%m-%d'):<12} 创业板    买入   {cy_close.iloc[ei]:>8.3f}  {'—':>8}")
+        elif etype in ('SELL_CY','STOP_CY') and entry_cy:
+            pnl=(cy_close.iloc[ei]/entry_cy[1]-1)*100
+            tag='止损'if etype=='STOP_CY'else'卖出'
+            print(f"  {main_sub['date'].iloc[ei].strftime('%m-%d'):<12} 创业板    {tag:<6} {cy_close.iloc[ei]:>8.3f}  {pnl:>+7.1f}%")
+            entry_cy=None
+    print(f"  近{lookback}日净值: {(navs[-1]-1)*100:+.1f}%")
+
+    # ===== iPhone画图 6×12 =====
+    fig=plt.figure(figsize=(6,12),facecolor='#FAFAFA')
+    gs=fig.add_gridspec(4,1,height_ratios=[0.8,1.5,1.5,1.2],hspace=0.25,
+                        left=0.06,right=0.94,top=0.97,bottom=0.03)
+
+    # P0: 信息栏
+    ax0=fig.add_subplot(gs[0]); ax0.axis('off')
+    ax0.text(0,0.8,f'YH05 {r["date"].strftime("%Y-%m-%d")}',fontsize=15,fontweight='bold',color='#1A1A1A')
+    ax0.text(0,0.3,f'{main_sig}{warn}',fontsize=16,fontweight='bold',color='#E67E22' if warn else '#1A1A1A')
+    ax0.text(0,0.0,f'{sub_state}',fontsize=11,color='#555')
+
+    # A股配色: 红涨绿跌
+    cn_colors=mpf.make_marketcolors(up='#CC0000',down='#008800',edge='inherit',wick='inherit',volume='inherit')
+    cn_style=mpf.make_mpf_style(marketcolors=cn_colors,gridstyle='')
+
+    # P1: 红利低波K线(红)
+    ax1=fig.add_subplot(gs[1])
+    mpf.plot(main,type='candle',ax=ax1,volume=False,style=cn_style)
+    ax1.set_title(f'{MAIN_NAME}  RSI{rsi:.1f}  BB{bb_pos:.0f}%',fontsize=11,loc='left',color='#CC2222')
     ax1.tick_params(labelsize=8); ax1.grid(True,alpha=0.15)
-    # BB带
-    ax1.axhline(y=main_px,color='#9B59B6',lw=0.5,ls='--',alpha=0.3)
+    # 买卖标记
+    for ei,etype in events:
+        if etype in ('BUY_MAIN','SELL_MAIN'):
+            ax1.scatter(ei,main['Close'].iloc[ei]if etype=='BUY_MAIN' else main['High'].iloc[ei],
+                       color='#CC2222'if etype=='BUY_MAIN'else'#008800',s=100,marker='^'if etype=='BUY_MAIN'else'v',
+                       zorder=10,edgecolors='white',lw=1.5)
 
-    # 创业板K线(下)
-    ax2=fig.add_axes([0.05,0.08,0.9,0.37])
-    mpf.plot(cy,type='candle',ax=ax2,volume=False,style='charles')
-    ax2.set_title(f'创业板  MACD{macd_v:+.3f}  动量{cy_mom:+.1%}',fontsize=10,loc='left',color='#E74C3C')
+    # P2: 创业板K线(紫)
+    ax2=fig.add_subplot(gs[2])
+    mpf.plot(cy,type='candle',ax=ax2,volume=False,style=cn_style)
+    ax2.set_title(f'创业板  MACD{macd_v:+.3f}  动量{cy_mom:+.1%}',fontsize=11,loc='left',color='#9B59B6')
     ax2.tick_params(labelsize=8); ax2.grid(True,alpha=0.15)
+    # 买卖标记
+    for ei,etype in events:
+        if etype=='BUY_CY':
+            ax2.scatter(ei,cy['Low'].iloc[ei],color='#CC0000',s=100,marker='^',zorder=10,edgecolors='white',lw=1.5)
+        elif etype in ('STOP_CY','SELL_CY'):
+            ax2.scatter(ei,cy['High'].iloc[ei],color='#008800',s=100,marker='v',zorder=10,edgecolors='white',lw=1.5)
 
-    buf=io.BytesIO(); plt.savefig(buf,dpi=120,bbox_inches='tight',facecolor='#FAFAFA'); plt.close()
+    # P3: 策略收益曲线
+    ax3=fig.add_subplot(gs[3])
+    ax3.set_facecolor('#FFFFFF')
+    nav_color='#CC2222' if navs[-1]>=1 else '#228B22'
+    ax3.fill_between(range(len(navs)),1,navs,alpha=0.1,color=nav_color)
+    ax3.plot(range(len(navs)),navs,color=nav_color,lw=1.8)
+    ax3.axhline(y=1,color='#AAA',lw=0.8,ls='--')
+    # 标记换仓事件(大号散点,红=红利,紫=创业)
+    for ei,etype in events:
+        y_pos=navs[ei]
+        if etype=='BUY_CY':
+            ax3.scatter(ei,y_pos,color='#9B59B6',s=90,marker='^',zorder=5,edgecolors='white',lw=1.5)
+        elif etype=='STOP_CY':
+            ax3.scatter(ei,y_pos,color='#9B59B6',s=90,marker='v',zorder=5,edgecolors='white',lw=1.5)
+        elif etype=='BUY_MAIN':
+            ax3.scatter(ei,y_pos,color='#CC2222',s=90,marker='^',zorder=5,edgecolors='white',lw=1.5)
+        elif etype=='SELL_MAIN':
+            ax3.scatter(ei,y_pos,color='#CC2222',s=90,marker='v',zorder=5,edgecolors='white',lw=1.5)
+    ax3.set_xlim(-1,len(navs))
+    ax3.set_title(f'策略净值 (近{lookback}日) {(navs[-1]-1)*100:+.1f}%',fontsize=11,loc='left',color=nav_color)
+    ax3.tick_params(labelsize=8); ax3.grid(True,alpha=0.12)
+
+    buf=io.BytesIO(); plt.savefig(buf,dpi=150,bbox_inches='tight',facecolor='#FAFAFA'); plt.close()
     return buf.getvalue(), main_sig, main_px, rsi, bb_pos, sub_state, warn
 
 def upload_chart(token,img_bytes):
@@ -168,15 +292,14 @@ def main():
                 try: token=open(p).read().strip(); break
                 except: pass
         chart_url=''
-        if token:
-            chart_url=upload_chart(token,img_bytes)
-            print(f'  {chart_url}')
+        if token: chart_url=upload_chart(token,img_bytes)
 
         body=(f'{sig}{warn}\n'
               f'{sub_state}\n'
               f'红利低波@{px:.3f} RSI{rsi:.1f} BB{bb_pos:.0f}%')
         send_bark(f'YH05 {sig}{warn}',body,chart_url)
-        print("完成!")
+        with open('_preview.png','wb') as f: f.write(img_bytes)
+        print(f"完成! 图表: _preview.png")
     except Exception as e:
         print(f"失败: {e}"); import traceback; traceback.print_exc()
         send_bark('YH05信号失败',str(e)[:200])
