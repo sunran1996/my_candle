@@ -52,6 +52,73 @@ def month_returns(df, n_months=12):
     monthly['ret'] = (monthly['close'] / monthly['open'] - 1) * 100
     return monthly.tail(n_months)
 
+def gen_chart_kline(df, raw_ohlc, nav_start=1_000_000, lookback=120):
+    """mplfinance K线版"""
+    import mplfinance as mpf
+    r=df.iloc[-1]; prev=df.iloc[-2]; price=r['close']; rsi=r['rsi']
+    bb_pos=(r['adj_close']-r['lower'])/(r['upper']-r['lower'])*100
+    expanding=(r['upper']-r['lower'])/r['ma']>(prev['upper']-prev['lower'])/prev['ma']
+    trend_cn='扩张'if expanding else'收缩'
+    upper_acc=r['upper_acc']if not np.isnan(r['upper_acc'])else 0
+    price_acc=r['price_acc']if not np.isnan(r['price_acc'])else 0
+
+    if expanding:
+        buy_ok=(r['adj_close']<=r['lower']or rsi<=RSI_OVERSOLD)
+        sell_raw=r['adj_close']>=r['upper']and rsi>=EXPAND_RSI_SELL
+        sell_ok=sell_raw and not(upper_acc>BB_ACCEL_UP and price_acc>0)
+    else:
+        buy_ok=(r['adj_close']<=r['lower']or rsi<=RSI_OVERSOLD)
+        sell_ok=(r['adj_close']>=r['upper']or rsi>=RSI_OVERBOUGHT)
+    sig='BUY'if buy_ok and not sell_ok else('SELL'if sell_ok and not buy_ok else'HOLD')
+    sig_cn={'BUY':'买入','SELL':'卖出','HOLD':'持有'}[sig]
+
+    day_chg=(price-prev['close'])/prev['close']*100
+    recent=df.tail(lookback).copy()
+    recent['nav']=nav_start*recent['adj_close']/recent['adj_close'].iloc[0]
+    nvs=(recent['nav']/nav_start).tolist(); ret_lookback=(nvs[-1]-1)*100
+
+    # 预警
+    warn=''
+    if sig=='HOLD':
+        if bb_pos<35 or rsi<45: warn='⚠ 接近买入'
+        elif bb_pos>65 or rsi>60: warn='⚠ 接近卖出'
+
+    # K线数据
+    ohlc=raw_ohlc.tail(lookback).copy()
+    ohlc=ohlc.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
+    ohlc=ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
+
+    cn_colors=mpf.make_marketcolors(up='#CC0000',down='#008800',edge='inherit',wick='inherit',volume='inherit')
+    cn_style=mpf.make_mpf_style(marketcolors=cn_colors,gridstyle='')
+
+    fig=plt.figure(figsize=(6,11),facecolor='#FAFAFA')
+    gs=fig.add_gridspec(3,1,height_ratios=[0.8,2.5,1.5],hspace=0.2,left=0.06,right=0.94,top=0.97,bottom=0.03)
+
+    # P0: 信息栏
+    ax0=fig.add_subplot(gs[0]); ax0.axis('off')
+    price_c='#CC0000'if day_chg>=0 else'#008800'
+    ax0.text(0,0.8,f'{ETF_NAME}({ETF_SYMBOL.upper()})',fontsize=16,fontweight='bold',color='#1A1A1A')
+    ax0.text(0,0.3,f'{sig_cn}{warn} | {price:.3f} {day_chg:+.2f}% | RSI{rsi:.0f} BB{bb_pos:.0f}% {trend_cn}',fontsize=11,color='#E67E22'if warn else'#555')
+
+    # P1: K线
+    ax1=fig.add_subplot(gs[1])
+    mpf.plot(ohlc,type='candle',ax=ax1,volume=False,style=cn_style)
+    ax1.set_title(f'近{lookback}日 {ret_lookback:+.1f}%',fontsize=10,loc='left',color='#CC2222')
+    ax1.tick_params(labelsize=7); ax1.grid(True,alpha=0.12)
+
+    # P2: 净值曲线
+    ax2=fig.add_subplot(gs[2])
+    ax2.set_facecolor('#FFFFFF')
+    lc='#CC2222'if nvs[-1]>=1 else'#008800'
+    ax2.fill_between(range(len(nvs)),1,nvs,alpha=0.1,color=lc)
+    ax2.plot(range(len(nvs)),nvs,color=lc,lw=1.8)
+    ax2.axhline(y=1,color='#AAA',lw=0.8,ls='--')
+    ax2.set_title(f'净值 {ret_lookback:+.1f}%',fontsize=10,loc='left',color=lc)
+    ax2.tick_params(labelsize=7); ax2.grid(True,alpha=0.12)
+
+    buf=io.BytesIO(); plt.savefig(buf,dpi=150,bbox_inches='tight',facecolor='#FAFAFA'); plt.close()
+    return buf.getvalue(),sig_cn,price,rsi,bb_pos,trend_cn,upper_acc,price_acc,ret_lookback
+
 def gen_chart(df, nav_start=1_000_000, lookback=180):
     """浅色高级量化看板 — key:value同行"""
     r = df.iloc[-1]; prev = df.iloc[-2]
@@ -300,7 +367,7 @@ def main():
             print(f"\n{reason} (最新: {df['date'].iloc[-1].strftime('%Y-%m-%d')})")
 
         print("生成图表...")
-        img_bytes, sig, price, rsi, bb_pos, trend, upper_acc, price_acc, ret_pct = gen_chart(df)
+        img_bytes, sig, price, rsi, bb_pos, trend, upper_acc, price_acc, ret_pct = gen_chart_kline(df, df)
 
         token = os.environ.get('GH_TOKEN', '')
         if not token:
