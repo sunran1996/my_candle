@@ -136,18 +136,18 @@ def main():
             axes[0].tick_params(labelsize=7); axes[0].grid(True,alpha=0.12)
             fig.suptitle(f'YH04 {date.strftime("%Y-%m-%d")}  {action}',fontsize=13,fontweight='bold',y=0.98)
         else:
-            # 持有红利低波: 画K线+BB双轨
-            ohlc=raw[MAIN_NAME].tail(lookback).copy()
-            ohlc=ohlc.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
-            ohlc=ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
-            # BB轨道
-            bb_adj=df_main['adj'].tail(lookback).values
-            bb_ma=df_main['ma'].tail(lookback).values; bb_up=df_main['up'].tail(lookback).values; bb_lo=df_main['lo'].tail(lookback).values
+            # 持有红利低波: adj价格线+BB双轨(同一坐标系)
+            main_df=df_main.tail(lookback).copy()
+            adj_vals=main_df['adj'].values
+            bb_ma=main_df['ma'].values; bb_up=main_df['up'].values; bb_lo=main_df['lo'].values
+            dates=main_df['date'].values
+            # 用adj构造线图
+            adj_df=pd.DataFrame({'Close':adj_vals,'Open':adj_vals,'High':adj_vals,'Low':adj_vals},index=dates)
             ap_ma=mpf.make_addplot(bb_ma,color='#888',width=0.8,linestyle='--')
             ap_up=mpf.make_addplot(bb_up,color='#9B59B6',width=0.6,linestyle='--')
             ap_lo=mpf.make_addplot(bb_lo,color='#9B59B6',width=0.6,linestyle='--')
-            fig,axes=mpf.plot(ohlc,type='candle',volume=False,style=cn_s,addplot=[ap_ma,ap_up,ap_lo],
-                              returnfig=True,figsize=(6,8))
+            fig,axes=mpf.plot(adj_df,type='line',volume=False,style=cn_s,addplot=[ap_ma,ap_up,ap_lo],
+                              returnfig=True,figsize=(6,8),linecolor='#CC2222')
             axes[0].set_title(f'{MAIN_NAME} RSI{rsi:.0f} BB{bb_pos:.0f}%',fontsize=10,loc='left',color='#CC2222')
             axes[0].tick_params(labelsize=7); axes[0].grid(True,alpha=0.12)
             fig.suptitle(f'YH04 {date.strftime("%Y-%m-%d")}  {action}',fontsize=13,fontweight='bold',y=0.98)
