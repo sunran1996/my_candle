@@ -102,15 +102,15 @@ def main():
 
         # 状态判断
         if buy_ok:
-            action=f'🔴 买入红利低波'; detail=f'全仓{MAIN_NAME}@{main_px:.3f} RSI{rsi:.0f} BB{bb_pos:.0f}%'
+            action=f'🔴 买入红利低波'; detail=f'全仓{MAIN_NAME}@{main_px:.3f}'
         elif sell_ok and leader_macd>0:
-            action=f'🟢 换仓{leader}'; detail=f'卖{MAIN_NAME}→买{leader}@{leader_px:.3f} MACD{leader_macd:+.3f}'
+            action=f'🟢 换仓{leader}'; detail=f'{MAIN_NAME}→{leader}@{leader_px:.3f}'
         elif sell_ok:
-            action=f'⚫ 现金等待'; detail=f'{MAIN_NAME}已卖 MACD全负'
+            action=f'⚫ 现金等待'; detail=f'{MAIN_NAME}已卖出, MACD全负'
         else:
-            action=f'⚪ 持有{warn}'; detail=f'{MAIN_NAME}@{main_px:.3f} RSI{rsi:.0f} BB{bb_pos:.0f}% | 副线{leader} MACD{leader_macd:+.3f}{" 可追" if leader_macd>0 else ""}'
+            action=f'⚪ 持有{warn}'; detail=f'{MAIN_NAME}@{main_px:.3f}'
 
-        sub_rank=' > '.join(f'{n}({scores[n]:+.3f})'for n in ranking[:3])
+        sub_rank=f'RSI{rsi:.0f} BB{bb_pos:.0f}% | '+' > '.join(f'{n}({scores[n]:+.3f})'for n in ranking[:3])
 
         # ===== K线图 + 净值看板 =====
         lookback=120
@@ -168,8 +168,8 @@ def main():
         ax0=fig.add_subplot(gs[0]); ax0.axis('off'); ax0.set_ylim(0,6)
         ax0.text(0,5,f'YH04  {date.strftime("%Y-%m-%d")}',fontsize=14,fontweight='bold',color='#1A1A1A')
         ax0.text(0,3.5,f'{action}',fontsize=18,fontweight='bold',color='#E67E22'if warn else'#1A1A1A')
-        ax0.text(0,1.8,f'{detail}',fontsize=10,color='#555')
-        ax0.text(0,0.5,f'副线: {sub_rank}',fontsize=9,color='#888')
+        ax0.text(0,2.0,f'{detail}',fontsize=10,color='#555')
+        ax0.text(0,0.8,f'副线 {sub_rank}',fontsize=10,color='#888')
 
         if sell_ok and leader_macd>0 and leader in raw:
             # 持有成长: K线+MACD
