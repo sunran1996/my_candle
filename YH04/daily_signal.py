@@ -101,10 +101,13 @@ def main():
             action=f'🟢 换仓{leader}'
             detail=f'卖{MAIN_NAME}@{main_px:.3f} → 买{leader}@{leader_px:.3f} | 止损-10% | MACD{leader_macd:+.3f}'
         elif not sell_ok and not buy_ok and leader_macd>0:
-            # 持有状态: 主线HOLD + 成长MACD>0 → 上次卖出后应已买入创业板
+            # 持有创业板
             stop_px = leader_px * 0.9
-            action=f'🟡 持有{leader}'
-            detail=f'{leader}@{leader_px:.3f} | 止损线{stop_px:.3f} | MACD{leader_macd:+.3f} | 等主线买入切回'
+            growth_warn=''
+            if leader_macd < 0.005: growth_warn=f' ⚠ MACD接近翻绿({leader_macd:+.3f})'
+            if leader_px < stop_px * 1.03: growth_warn+=f' ⚠ 接近止损线'
+            action=f'🟡 持有{leader}{growth_warn}'
+            detail=f'{leader}@{leader_px:.3f} | 止损{stop_px:.3f} | MACD{leader_macd:+.3f} | 等主线买入切回'
         elif sell_ok:
             action=f'⚫ 卖出红利低波,持币'
             detail=f'卖{MAIN_NAME}@{main_px:.3f} | MACD全负 | 等翻红再进场'
@@ -129,8 +132,8 @@ def main():
 
         body=(f'{action}\n{detail}\n副线: {sub_rank}')
         if warn: body+=f'\n{warn}'
-        # send_bark(f'YH04 {action}',body)  # debug: 暂停推送
+        send_bark(f'YH04 {action}',body)
     except Exception as e:
-        print(f"失败: {e}")  # send_bark暂停
+        print(f"失败: {e}"); send_bark('YH04信号失败',str(e)[:200])
 
 if __name__=='__main__': main()
