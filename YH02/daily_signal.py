@@ -89,7 +89,7 @@ def gen_chart_kline(df, raw_ohlc, nav_start=1_000_000, lookback=120):
     ohlc=ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
 
     cn_colors=mpf.make_marketcolors(up='#CC0000',down='#008800',edge='inherit',wick='inherit',volume='inherit')
-    cn_style=mpf.make_mpf_style(marketcolors=cn_colors,gridstyle='')
+    cn_style=mpf.make_mpf_style(marketcolors=cn_colors,gridstyle='',rc={'font.sans-serif':[CN_SANS,'DejaVu Sans'],'axes.unicode_minus':False})
 
     fig=plt.figure(figsize=(6,11),facecolor='#FAFAFA')
     gs=fig.add_gridspec(3,1,height_ratios=[0.8,2.5,1.5],hspace=0.2,left=0.06,right=0.94,top=0.97,bottom=0.03)
