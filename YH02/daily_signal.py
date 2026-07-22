@@ -139,8 +139,8 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     # 预警接在持有后面
     warn=''
     if sig=='HOLD':
-        if bb_pos<30 or rsi<40: warn=' ⚠ 接近买入'
-        elif bb_pos>70 and rsi>55: warn=' ⚠ 接近卖出'
+        if bb_pos<35 or rsi<45: warn=' ⚠ 接近买入'
+        elif bb_pos>65 or rsi>60: warn=' ⚠ 接近卖出'
     ax.text(3.0, 1.0, sig_cn + warn, fontsize=18, fontweight='bold', color='#000000', va='center')
 
     # ── P2: NAV ──
@@ -319,8 +319,8 @@ def main():
         # 预警
         warn=''
         if sig=='持有':
-            if bb_pos<30 or rsi<40: warn=' ⚠ 接近买入'
-            elif bb_pos>70 and rsi>55: warn=' ⚠ 接近卖出'
+            if bb_pos<35 or rsi<45: warn=' ⚠ 接近买入'
+            elif bb_pos>65 or rsi>60: warn=' ⚠ 接近卖出'
         body = (f'{prefix}价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%  {trend}{warn}\n'
                 f'近半年收益 {ret_pct:+.1f}%\n'
                 f'上轨加速度 {upper_acc:+.4f}  价格加速度 {price_acc:+.4f}')
