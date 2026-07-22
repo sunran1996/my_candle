@@ -46,6 +46,22 @@ def main():
     try:
         print("获取数据...")
         raw=fetch(); df_main=add_main(raw[MAIN_NAME])
+        # 实时行情
+        is_weekend=pd.Timestamp.now().dayofweek>=5
+        if not is_weekend:
+            try:
+                spot=ak.fund_etf_spot_em()
+                for code,name in [('512890','红利低波'),('159915','创业板')]:
+                    s=spot[spot['代码']==code]
+                    if len(s)>0:
+                        rt=float(s['最新价'].iloc[0])
+                        old=raw[name]['close'].iloc[-1]
+                        if rt>0 and abs(rt-old)/old<0.05:
+                            raw[name].loc[raw[name].index[-1],'close']=rt
+                            raw[name].loc[raw[name].index[-1],'date']=pd.Timestamp.now()
+                            print(f'  {name} 实时价: {rt:.4f}')
+                df_main=add_main(raw[MAIN_NAME])
+            except Exception as e: print(f'  实时行情失败: {e}')
         dfs_g={n:add_growth(d) for n,d in raw.items() if n!=MAIN_NAME}
         idx=-1; pos=len(df_main)+idx; row=df_main.iloc[pos]; date=row['date']
         adj,rsi,lo,up=row['adj'],row['rsi'],row['lo'],row['up']
