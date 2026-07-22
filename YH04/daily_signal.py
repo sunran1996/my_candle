@@ -114,8 +114,8 @@ def main():
         print(f"{'='*60}")
 
         body=(f'{action}\n{detail}\n副线: {sub_rank}')
-        send_bark(f'YH04 {action}',body)
+        # send_bark(f'YH04 {action}',body)  # debug: 暂停推送
     except Exception as e:
-        print(f"失败: {e}"); send_bark('YH04信号失败',str(e)[:200])
+        print(f"失败: {e}")  # send_bark暂停
 
 if __name__=='__main__': main()
