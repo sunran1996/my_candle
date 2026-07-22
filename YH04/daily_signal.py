@@ -48,6 +48,7 @@ def main():
         raw=fetch(); df_main=add_main(raw[MAIN_NAME])
         # 实时行情
         is_weekend=pd.Timestamp.now().dayofweek>=5
+        rt_updated=False
         if not is_weekend:
             try:
                 spot=ak.fund_etf_spot_em()
@@ -56,12 +57,13 @@ def main():
                     if len(s)>0:
                         rt=float(s['最新价'].iloc[0])
                         old=raw[name]['close'].iloc[-1]
-                        if rt>0 and abs(rt-old)/old<0.05:
-                            raw[name].loc[raw[name].index[-1],'close']=rt
-                            raw[name].loc[raw[name].index[-1],'date']=pd.Timestamp.now()
-                            print(f'  {name} 实时价: {rt:.4f}')
-                df_main=add_main(raw[MAIN_NAME])
-            except Exception as e: print(f'  实时行情失败: {e}')
+                        raw[name].loc[raw[name].index[-1],'close']=rt
+                        raw[name].loc[raw[name].index[-1],'date']=pd.Timestamp.now()
+                        rt_updated=True
+                        print(f'  {name} 收盘{old:.4f}→实时{rt:.4f}')
+                if rt_updated: df_main=add_main(raw[MAIN_NAME])
+            except Exception as e: print(f'  实时行情失败(用收盘价): {e}')
+        if not rt_updated: print(f'  使用历史收盘价(周末或无实时数据)')
         dfs_g={n:add_growth(d) for n,d in raw.items() if n!=MAIN_NAME}
         idx=-1; pos=len(df_main)+idx; row=df_main.iloc[pos]; date=row['date']
         adj,rsi,lo,up=row['adj'],row['rsi'],row['lo'],row['up']
