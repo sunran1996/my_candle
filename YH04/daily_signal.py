@@ -164,11 +164,12 @@ def main():
         fig=plt.figure(figsize=(6,10),facecolor='#FAFAFA')
         gs=fig.add_gridspec(3,1,height_ratios=[1.0,2.5,1.2],hspace=0.2,left=0.06,right=0.94,top=0.96,bottom=0.03)
 
-        # P0: 信息栏
-        ax0=fig.add_subplot(gs[0]); ax0.axis('off')
-        ax0.text(0,0.8,f'YH04 {date.strftime("%Y-%m-%d")}',fontsize=15,fontweight='bold',color='#1A1A1A')
-        ax0.text(0,0.4,f'{action}',fontsize=16,fontweight='bold',color='#E67E22'if warn else'#1A1A1A')
-        ax0.text(0,0.1,f'{detail} | 副线: {sub_rank}',fontsize=9,color='#888')
+        # P0: 信息栏(换行)
+        ax0=fig.add_subplot(gs[0]); ax0.axis('off'); ax0.set_ylim(0,6)
+        ax0.text(0,5,f'YH04  {date.strftime("%Y-%m-%d")}',fontsize=14,fontweight='bold',color='#1A1A1A')
+        ax0.text(0,3.5,f'{action}',fontsize=18,fontweight='bold',color='#E67E22'if warn else'#1A1A1A')
+        ax0.text(0,1.8,f'{detail}',fontsize=10,color='#555')
+        ax0.text(0,0.5,f'副线: {sub_rank}',fontsize=9,color='#888')
 
         if sell_ok and leader_macd>0 and leader in raw:
             # 持有成长: K线+MACD
