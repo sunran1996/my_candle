@@ -138,6 +138,15 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     ax.text(0.8, 1.0, sig, fontsize=18, fontweight='bold', color='#000000', family='monospace', va='center')
     ax.text(3.0, 1.0, sig_cn, fontsize=18, fontweight='bold', color='#000000', va='center')
 
+    # 预警线
+    warn=''
+    if sig=='HOLD':
+        if bb_pos<30 or rsi<40: warn='预警: 接近买入区间'
+        elif bb_pos>70 and rsi>55: warn='预警: 接近卖出区间'
+    elif sig=='BUY' and bb_pos<5: warn='买入信号确认(价格触及下轨)'
+    elif sig=='SELL' and bb_pos>95: warn='卖出信号确认(价格触及上轨)'
+    if warn: ax.text(0.5, -0.6, warn, fontsize=11, color='#E67E22', fontweight='bold')
+
     # ── P2: NAV ──
     ax = fig.add_subplot(gs[1]); ax.set_facecolor(CARD)
     line_c = UP if nvs[-1] >= 1 else DN
@@ -255,20 +264,29 @@ def main():
         print("获取数据...")
         df = get_data(ETF_SYMBOL)
 
-        # 叠加实时行情 (仅交易日)
+        # 叠加实时行情
         is_weekend = pd.Timestamp.now().dayofweek >= 5
+        old_close = df['close'].iloc[-1]
+        old_date  = df['date'].iloc[-1]
+        print(f"  历史数据: {old_date.strftime('%m-%d')} close={old_close:.4f}")
         if not is_weekend:
             try:
                 spot = ak.fund_etf_spot_em()
                 spot = spot[spot['代码'] == '512890']
                 if len(spot) > 0:
                     rt_price = float(spot['最新价'].iloc[0])
-                    if rt_price > 0 and abs(rt_price - df['close'].iloc[-1]) / df['close'].iloc[-1] < 0.05:
+                    gap = abs(rt_price - old_close) / old_close
+                    print(f"  实时行情: {rt_price:.4f} (偏差{gap*100:.2f}%)")
+                    if rt_price > 0 and gap < 0.05:
                         df.loc[df.index[-1], 'close'] = rt_price
                         df.loc[df.index[-1], 'date'] = pd.Timestamp.now()
-                        print(f"  实时价: {rt_price:.4f}")
+                        print(f"  ✓ 已更新为实时价")
+                    else:
+                        print(f"  ⚠ 偏差超5%, 保留收盘价")
             except Exception as e:
-                print(f"  实时行情获取失败, 用收盘价: {e}")
+                print(f"  ⚠ 实时行情获取失败: {e}")
+        else:
+            print(f"  周末, 使用收盘价")
 
         df = compute_indicators(df)
 
@@ -302,7 +320,12 @@ def main():
             print("无 GH_TOKEN, 跳过图表上传")
 
         prefix = f'{reason} · ' if non_trading else ''
-        body = (f'{prefix}价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%  {trend}\n'
+        # 预警
+        warn=''
+        if sig=='持有':
+            if bb_pos<30 or rsi<40: warn=' ⚠ 接近买入'
+            elif bb_pos>70 and rsi>55: warn=' ⚠ 接近卖出'
+        body = (f'{prefix}价格 {price:.4f}  RSI {rsi:.1f}  BB {bb_pos:.0f}%  {trend}{warn}\n'
                 f'近半年收益 {ret_pct:+.1f}%\n'
                 f'上轨加速度 {upper_acc:+.4f}  价格加速度 {price_acc:+.4f}')
         emoji = {'买入': '🟢', '卖出': '🔴'}.get(sig, '⚪')
