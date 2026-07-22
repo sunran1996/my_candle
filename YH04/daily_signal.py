@@ -30,8 +30,9 @@ def fetch():
 def add_main(df):
     df=df.copy(); r=df['close'].pct_change().fillna(0); r[abs(r)>0.1]=0
     df['adj']=(1+r).cumprod()
-    df['ma']=df['adj'].rolling(BB_P).mean(); df['std']=df['adj'].rolling(BB_P).std()
-    df['up']=df['ma']+BB_S*df['std']; df['lo']=df['ma']-BB_S*df['std']
+    # BB用原始收盘价(K线坐标系)
+    df['bb_ma']=df['close'].rolling(BB_P).mean(); df['bb_std']=df['close'].rolling(BB_P).std()
+    df['up']=df['bb_ma']+BB_S*df['bb_std']; df['lo']=df['bb_ma']-BB_S*df['bb_std']
     d=df['adj'].diff(); g=d.clip(lower=0); l=(-d).clip(lower=0)
     df['rsi']=100-100/(1+g.ewm(alpha=1/RSI_P,adjust=False).mean()/l.ewm(alpha=1/RSI_P,adjust=False).mean().replace(0,np.nan))
     return df
@@ -74,11 +75,11 @@ def main():
                 dfs_g={n:add_growth(d) for n,d in raw.items() if n!=MAIN_NAME}
             except Exception as e: print(f'  实时行情失败: {e}')
 
-        # 信号
+        # 信号(用close-based BB)
         idx=-1; pos=len(df_main)+idx; row=df_main.iloc[pos]; date=row['date']
-        adj,rsi,lo,up=row['adj'],row['rsi'],row['lo'],row['up']
-        bb_pos=(adj-lo)/(up-lo)*100 if up>lo else 50; main_px=raw[MAIN_NAME]['close'].iloc[pos]
-        bb_buy=adj<=lo; bb_sell=adj>=up; rsi_buy=rsi<=RSI_L
+        price=row['close']; rsi=row['rsi']; lo=row['lo']; up=row['up']
+        bb_pos=(price-lo)/(up-lo)*100 if up>lo else 50; main_px=price
+        bb_buy=price<=lo; bb_sell=price>=up; rsi_buy=rsi<=RSI_L
         buy_ok=bb_buy or rsi_buy; sell_ok=(bb_sell and rsi>=ERS)
 
         # 成长排名
@@ -136,18 +137,18 @@ def main():
             axes[0].tick_params(labelsize=7); axes[0].grid(True,alpha=0.12)
             fig.suptitle(f'YH04 {date.strftime("%Y-%m-%d")}  {action}',fontsize=13,fontweight='bold',y=0.98)
         else:
-            # 持有红利低波: adj价格线+BB双轨(同一坐标系)
-            main_df=df_main.tail(lookback).copy()
-            adj_vals=main_df['adj'].values
-            bb_ma=main_df['ma'].values; bb_up=main_df['up'].values; bb_lo=main_df['lo'].values
-            dates=main_df['date'].values
-            # 用adj构造线图
-            adj_df=pd.DataFrame({'Close':adj_vals,'Open':adj_vals,'High':adj_vals,'Low':adj_vals},index=dates)
+            # 持有红利低波: K线+close-BB双轨
+            ohlc=raw[MAIN_NAME].tail(lookback).copy()
+            ohlc=ohlc.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
+            ohlc=ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
+            # close-based BB
+            bb_df=df_main.tail(lookback)
+            bb_ma=bb_df['bb_ma'].values; bb_up=bb_df['up'].values; bb_lo=bb_df['lo'].values
             ap_ma=mpf.make_addplot(bb_ma,color='#888',width=0.8,linestyle='--')
             ap_up=mpf.make_addplot(bb_up,color='#9B59B6',width=0.6,linestyle='--')
             ap_lo=mpf.make_addplot(bb_lo,color='#9B59B6',width=0.6,linestyle='--')
-            fig,axes=mpf.plot(adj_df,type='line',volume=False,style=cn_s,addplot=[ap_ma,ap_up,ap_lo],
-                              returnfig=True,figsize=(6,8),linecolor='#CC2222')
+            fig,axes=mpf.plot(ohlc,type='candle',volume=False,style=cn_s,addplot=[ap_ma,ap_up,ap_lo],
+                              returnfig=True,figsize=(6,8))
             axes[0].set_title(f'{MAIN_NAME} RSI{rsi:.0f} BB{bb_pos:.0f}%',fontsize=10,loc='left',color='#CC2222')
             axes[0].tick_params(labelsize=7); axes[0].grid(True,alpha=0.12)
             fig.suptitle(f'YH04 {date.strftime("%Y-%m-%d")}  {action}',fontsize=13,fontweight='bold',y=0.98)
