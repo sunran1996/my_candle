@@ -98,17 +98,15 @@ def main():
         if near_sell: warn=' ⚠ 接近卖出'
         elif near_buy: warn=' ⚠ 接近买入'
 
-        # 五态指令
+        # 状态判断
         if buy_ok:
             action=f'🔴 买入红利低波'; detail=f'全仓{MAIN_NAME}@{main_px:.3f} RSI{rsi:.0f} BB{bb_pos:.0f}%'
         elif sell_ok and leader_macd>0:
             action=f'🟢 换仓{leader}'; detail=f'卖{MAIN_NAME}→买{leader}@{leader_px:.3f} MACD{leader_macd:+.3f}'
-        elif not sell_ok and not buy_ok and leader_macd>0:
-            action=f'🟡 持有{leader}'; detail=f'{leader}@{leader_px:.3f} 止损{leader_px*.9:.3f}'
         elif sell_ok:
             action=f'⚫ 现金等待'; detail=f'{MAIN_NAME}已卖 MACD全负'
         else:
-            action=f'⚪ 持有{warn}'; detail=f'{MAIN_NAME}@{main_px:.3f} RSI{rsi:.0f} BB{bb_pos:.0f}%'
+            action=f'⚪ 持有{warn}'; detail=f'{MAIN_NAME}@{main_px:.3f} RSI{rsi:.0f} BB{bb_pos:.0f}% | 副线{leader} MACD{leader_macd:+.3f}{" 可追" if leader_macd>0 else ""}'
 
         sub_rank=' > '.join(f'{n}({scores[n]:+.3f})'for n in ranking[:3])
 
