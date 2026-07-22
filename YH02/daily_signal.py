@@ -136,16 +136,12 @@ def gen_chart(df, nav_start=1_000_000, lookback=180):
     # 信号
     ax.add_patch(plt.Rectangle((0.3, 0.2), 9.4, 1.6, color='#FAD5D5' if sig == 'SELL' else ('#D5F0D8' if sig == 'BUY' else '#F0E8F0'), zorder=0))
     ax.text(0.8, 1.0, sig, fontsize=18, fontweight='bold', color='#000000', family='monospace', va='center')
-    ax.text(3.0, 1.0, sig_cn, fontsize=18, fontweight='bold', color='#000000', va='center')
-
-    # 预警线
+    # 预警接在持有后面
     warn=''
     if sig=='HOLD':
-        if bb_pos<30 or rsi<40: warn='预警: 接近买入区间'
-        elif bb_pos>70 and rsi>55: warn='预警: 接近卖出区间'
-    elif sig=='BUY' and bb_pos<5: warn='买入信号确认(价格触及下轨)'
-    elif sig=='SELL' and bb_pos>95: warn='卖出信号确认(价格触及上轨)'
-    if warn: ax.text(0.5, -0.6, warn, fontsize=11, color='#E67E22', fontweight='bold')
+        if bb_pos<30 or rsi<40: warn=' ⚠ 接近买入'
+        elif bb_pos>70 and rsi>55: warn=' ⚠ 接近卖出'
+    ax.text(3.0, 1.0, sig_cn + warn, fontsize=18, fontweight='bold', color='#000000', va='center')
 
     # ── P2: NAV ──
     ax = fig.add_subplot(gs[1]); ax.set_facecolor(CARD)
