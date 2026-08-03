@@ -79,8 +79,8 @@ def gen_chart(raw,df_main,dfs_g,both=False):
     # 预警
     warn=''
     if main_sig=='持有':
-        if bb_pos<35 or rsi<45: warn=' ⚠ 接近买入'
-        elif bb_pos>65 or rsi>60: warn=' ⚠ 接近卖出'
+        if bb_pos<20 or rsi<35: warn=' ⚠ 接近买入'
+        elif bb_pos>80 or rsi>70: warn=' ⚠ 接近卖出'
 
     # 副线状态
     if buy_ok:
