@@ -156,13 +156,21 @@ def gen_chart(raw,df_main,dfs_g,both=False):
     elif sell_ok and macd_v>0:
         above_zero=macd_line>0
         pct='水上满仓' if above_zero else '水下3成'
-        if pos=='MAIN':   sub_state=f'🟢 换仓创业板 | {pct}'
+        if pos=='MAIN':   sub_state=f'🔥🔥 创业板买入信号触发！换仓创业板 | {pct}'
         elif pos=='CY':   sub_state=f'🟢 继续持有创业板@{cy_px:.3f} | {pct}'
         else:             sub_state=f'🟢 买入创业板@{cy_px:.3f} | {pct}'
     elif sell_ok:
         sub_state='⚫ 清仓,现金等待 | MACD全负'
     elif pos=='MAIN':
-        sub_state=f'🔴 继续持有红利低波@{main_px:.3f}'
+        # 持有红利时, 检查创业板买入条件(MACD>0 + 价格>MA20), 仅提示不操作
+        gdf = dfs_g['创业板']
+        cy_ma20 = gdf['ma20'].iloc[-1] if 'ma20' in gdf.columns else None
+        cy_entry_ok = macd_v > 0 and cy_ma20 is not None and not pd.isna(cy_ma20) and cy_px > cy_ma20
+        if cy_entry_ok:
+            sub_state=(f'🔴 继续持有红利低波@{main_px:.3f}\n'
+                       f'💡 创业板买入条件满足 MACD{macd_v:+.3f} 价>{cy_ma20:.3f}(仅提示)')
+        else:
+            sub_state=f'🔴 继续持有红利低波@{main_px:.3f}'
     elif pos=='CY':
         stop_px=cy_px*0.9
         sub_state=f'🟡 持有创业板@{cy_px:.3f} 止损{stop_px:.3f}'
