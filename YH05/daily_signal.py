@@ -82,19 +82,7 @@ def gen_chart(raw,df_main,dfs_g,both=False):
         if bb_pos<20 or rsi<35: warn=' ⚠ 接近买入'
         elif bb_pos>80 or rsi>70: warn=' ⚠ 接近卖出'
 
-    # 副线状态
-    if buy_ok:
-        sub_state=f'🔴 清创业板,满仓红利'
-    elif sell_ok and macd_v>0:
-        above_zero=macd_line>0
-        sub_state=f'🟢 换仓创业板 | {"水上满仓" if above_zero else "水下3成"}'
-    elif not sell_ok and not buy_ok and macd_v>0:
-        stop_px=cy_px*0.9
-        sub_state=f'🟡 持有创业板@{cy_px:.3f} 止损{stop_px:.3f}'
-    elif sell_ok:
-        sub_state=f'⚫ 现金等待 | MACD全负'
-    else:
-        sub_state=f'⚪ 红利低波@{main_px:.3f} | 创业板MACD{macd_v:+.3f}'
+    # 副线状态 — 在回测之后根据实际持仓pos生成
 
     # ===== 120日迷你回测 =====
     lookback=120
@@ -159,6 +147,22 @@ def gen_chart(raw,df_main,dfs_g,both=False):
         navs.append(cash+shares_main*mp+shares_cy*cp)
 
     navs=np.array(navs); navs=navs/navs[0]
+
+    # ── 副线状态: 根据回测最终持仓 + 当前信号 ──
+    if buy_ok:
+        sub_state=f'🔴 清创业板,满仓红利'
+    elif sell_ok and macd_v>0:
+        above_zero=macd_line>0
+        sub_state=f'🟢 换仓创业板 | {"水上满仓" if above_zero else "水下3成"}'
+    elif sell_ok:
+        sub_state=f'⚫ 现金等待 | MACD全负'
+    elif pos=='MAIN':
+        sub_state=f'🔴 继续持有红利低波@{main_px:.3f}'
+    elif pos=='CY':
+        stop_px=cy_px*0.9
+        sub_state=f'🟡 持有创业板@{cy_px:.3f} 止损{stop_px:.3f}'
+    else:
+        sub_state=f'⚪ 空仓观望 | 红利低波@{main_px:.3f} 创业板MACD{macd_v:+.3f}'
 
     # 打印交易明细
     print(f"\n  {'日期':<12} {'标的':<8} {'方向':<6} {'价格':>8} {'盈亏':>8}")
@@ -243,7 +247,7 @@ def gen_chart(raw,df_main,dfs_g,both=False):
     ax3.tick_params(labelsize=8); ax3.grid(True,alpha=0.12)
 
     buf=io.BytesIO(); plt.savefig(buf,dpi=150,bbox_inches='tight',facecolor='#FAFAFA'); plt.close()
-    return buf.getvalue(), main_sig, main_px, rsi, bb_pos, sub_state, warn
+    return buf.getvalue(), main_sig, main_px, rsi, bb_pos, sub_state, warn, pos
 
 def upload_chart(token,img_bytes):
     ts=pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
@@ -284,7 +288,7 @@ def main():
             except Exception as e: print(f'  实时行情失败: {e}')
 
         print("生成图表...")
-        img_bytes,sig,px,rsi,bb_pos,sub_state,warn=gen_chart(raw,df_main,dfs_g)
+        img_bytes,sig,px,rsi,bb_pos,sub_state,warn,pos=gen_chart(raw,df_main,dfs_g)
 
         token=os.environ.get('GH_TOKEN','')
         if not token:
