@@ -150,12 +150,17 @@ def gen_chart(raw,df_main,dfs_g,both=False):
 
     # ── 副线状态: 根据回测最终持仓 + 当前信号 ──
     if buy_ok:
-        sub_state=f'🔴 清创业板,满仓红利'
+        if pos=='CY':    sub_state='🔴 清创业板,满仓红利'
+        elif pos=='MAIN': sub_state=f'🔴 加仓红利低波@{main_px:.3f}'
+        else:             sub_state=f'🔴 买入红利低波@{main_px:.3f}'
     elif sell_ok and macd_v>0:
         above_zero=macd_line>0
-        sub_state=f'🟢 换仓创业板 | {"水上满仓" if above_zero else "水下3成"}'
+        pct='水上满仓' if above_zero else '水下3成'
+        if pos=='MAIN':   sub_state=f'🟢 换仓创业板 | {pct}'
+        elif pos=='CY':   sub_state=f'🟢 继续持有创业板@{cy_px:.3f} | {pct}'
+        else:             sub_state=f'🟢 买入创业板@{cy_px:.3f} | {pct}'
     elif sell_ok:
-        sub_state=f'⚫ 现金等待 | MACD全负'
+        sub_state='⚫ 清仓,现金等待 | MACD全负'
     elif pos=='MAIN':
         sub_state=f'🔴 继续持有红利低波@{main_px:.3f}'
     elif pos=='CY':
