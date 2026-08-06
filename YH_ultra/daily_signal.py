@@ -97,6 +97,9 @@ def run_backtest(start_str=None):
     SCALE_PCTS = [0.30, 0.30, 0.40]  # 分三次: 30%+30%+40%=100%仓位
 
     for date in dates:
+        # 新的一天, 重置同日卖出标记
+        for n in STOCKS:
+            if scale_step[n] == -1: scale_step[n] = 0
         px = {n: raw[n][raw[n]['date']==date]['close'].iloc[0]
               for n in STOCKS if len(raw[n][raw[n]['date']==date])>0}
 
@@ -118,17 +121,17 @@ def run_backtest(start_str=None):
                 trades.append({'date':date,'name':n,'dir':'SELL','price':cp,
                                'pnl':pnl*100,'reason':why})
                 if pnl >= 0:
-                    # 盈利→重置缩放模式
                     scale_step[n] = 0; loss[n] = False
                 else:
-                    # 亏损→触发缩放模式
                     loss[n] = True; scale_step[n] = 0
                 shares[n] = 0; entry[n] = 0; high[n] = 0
+                scale_step[n] = -1  # 当天禁止再买同只股票
 
         nav = cash + sum(shares[n]*px.get(n,0) for n in STOCKS)
 
         # ── 买入 ──
         for n in STOCKS:
+            if scale_step[n] == -1: continue  # 当天卖过, 不买回
             cp = px.get(n, 0); r = dfs[n][dfs[n]['date']==date]
             if cp <= 0 or len(r)==0: continue
 
@@ -204,7 +207,8 @@ def run_backtest(start_str=None):
     RED = '#CC0000'; GREEN = '#008800'; PURPLE = '#9B59B6'; BLUE = '#3498DB'
     ORANGE = '#E67E22'; GRAY = '#888888'; CYAN = '#2ECC71'; DBLUE = '#2980B9'
     colors4 = [RED, ORANGE, CYAN, DBLUE]
-    plot_start = ndf['date'].iloc[-1] - pd.DateOffset(years=3)
+    days = (ndf['date'].iloc[-1] - ndf['date'].iloc[0]).days
+    plot_start = ndf['date'].iloc[0] if days <= 365 else ndf['date'].iloc[-1] - pd.DateOffset(years=3)
 
     fig = plt.figure(figsize=(20, 22), facecolor='white')
     gs = fig.add_gridspec(6, 1, height_ratios=[1.2, 2.2, 2.2, 2.2, 2.2, 1.0],
