@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-个股交易策略 v9: YH02趋势延迟卖出
-标的: 山东高速(600350) + 渝农商行(601077)
+个股交易策略 v10: 纯均值回归
+标的: 山东高速 渝农商行 皖通高速 江苏银行
 
-买入: RSI<42 或 距BB下轨<25%
-卖出: YH02扩张延迟逻辑 + 移动止损5% + 硬止损10%
-      BB扩张(趋势加速)→延迟卖, BB收缩→正常卖
+买入: RSI≤42 且 BB距下轨≤25%（评≥2）
+卖出: 止盈+20% / 移动止损-8% / 硬止损-10%
 """
 import sys, io, os, json, ssl, base64, warnings
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -32,9 +31,9 @@ RSI_BUY = 42; BB_BUY = 0.25
 RSI_STRICT = 35; BB_STRICT = 0.18
 
 # 卖出 — YH02风格
-RSI_H = 70; ERS = 75      # RSI高位 / 扩张模式RSI阈值(提高)
-TRAIL_STOP = 0.08          # 移动止损8%
-HARD_STOP  = 0.10          # 硬止损10%
+TAKE_PROFIT = 0.20         # 止盈20%
+TRAIL_STOP  = 0.08          # 移动止损8%
+HARD_STOP   = 0.10          # 硬止损10%
 
 SCRIPT = os.path.dirname(os.path.abspath(__file__))
 
@@ -68,7 +67,7 @@ def check_buy(row, strict=False):
     rsi_ok = rsi <= rsi_th
     bb_ok = dist <= bb_th
     if strict:
-        # 严格模式: 阈值收紧, 至少满足一个
+        # 严格模式: 阈值收紧, 必须同时满足
         score = (1 if rsi_ok else 0) + (1 if bb_ok else 0)
         if rsi <= 25: score += 1
         return score >= 1, score
@@ -90,7 +89,6 @@ def run_backtest(start_str=None):
     shares = {n: 0.0 for n in STOCKS}
     entry = {n: 0.0 for n in STOCKS}
     high = {n: 0.0 for n in STOCKS}
-    pbw = {n: None for n in STOCKS}  # 上一期BB带宽
     loss = {n: False for n in STOCKS}  # 上笔是否亏损→触发缩放模式
     scale_step = {n: 0 for n in STOCKS}  # 缩放模式: 0=正常, 1/2/3=第几次买入
     scale_entry = {n: 0.0 for n in STOCKS}  # 缩放模式累计成本(算加权均价)
@@ -110,29 +108,10 @@ def run_backtest(start_str=None):
             if cp > high[n]: high[n] = cp
             pnl = cp / entry[n] - 1; dd = cp / high[n] - 1
 
-            # YH02风格卖出: BB扩张延迟, BB收缩正常
-            bw = r.iloc[0]['bb_bw'] if not pd.isna(r.iloc[0].get('bb_bw')) else None
-            expanding = (pbw[n] is not None and bw is not None and bw > pbw[n])
-            at_bb_up = cp >= r.iloc[0]['bb_up'] if not pd.isna(r.iloc[0].get('bb_up')) else False
-            rsi_v = r.iloc[0]['rsi']
-
-            yh_sell = False; yh_why = ''
-            if expanding:
-                # 扩张=趋势加速, 延迟卖出: 必须同时满足BB上轨+RSI>=65
-                if at_bb_up and not pd.isna(rsi_v) and rsi_v >= ERS:
-                    yh_sell = True; yh_why = f'扩张触顶 RSI{rsi_v:.0f}'
-            else:
-                # 收缩=正常卖出: BB上轨 或 RSI>=70
-                if at_bb_up: yh_sell = True; yh_why = 'BB上轨'
-                elif not pd.isna(rsi_v) and rsi_v >= RSI_H:
-                    yh_sell = True; yh_why = f'RSI超买{rsi_v:.0f}'
-
             do = False; why = ''
             if pnl <= -HARD_STOP: do = True; why = f'硬止损{pnl*100:+.1f}%'
             elif dd <= -TRAIL_STOP: do = True; why = f'移动止损{dd*100:+.1f}%'
-            elif yh_sell: do = True; why = f'{yh_why} 盈{pnl*100:+.1f}%'
-
-            if bw is not None: pbw[n] = bw  # 更新带宽记忆
+            elif pnl >= TAKE_PROFIT: do = True; why = f'止盈{pnl*100:+.1f}%'
 
             if do:
                 cash += shares[n] * cp * (1-COMM-SLIP)
@@ -208,7 +187,7 @@ def run_backtest(start_str=None):
     cpct = (ndf['hold']=='CASH').sum()/len(ndf)*100
 
     print(f"\n{'='*60}")
-    print(f"  策略v9: YH02趋势延迟卖出")
+    print(f"  策略v10: 纯均值回归")
     print(f"  {'─'*40}")
     print(f"  累计: {ret:+.1f}%  年化: {ann:+.1f}%  夏普: {sr:.2f}  回撤: {mdd:+.1f}%")
     print(f"  交易: BUY{len(buys)} SELL{len(sells)}  胜率{wr:.0f}%  均盈{aw:+.1f}%  均亏{al:+.1f}%  空仓{cpct:.0f}%")
@@ -370,13 +349,19 @@ def live_signal():
     for name in STOCKS:
         row = dfs[name].iloc[-1]
         close = row['close']; rsi = row['rsi']
-        bb_up = row['bb_up']; bb_lo = row['bb_lo']
+        bb_up = row['bb_up']; bb_lo = row['bb_lo']; bb_ma = row['bb_ma']
         bb_range = bb_up - bb_lo
         bb_pos = (close-bb_lo)/(bb_up-bb_lo)*100 if bb_range>0 else 50
+
         buy_ok, sc = check_buy(row)
         if buy_ok: buy_list.append((name, sc))
-        sig = f'★ 买入(评{sc})' if buy_ok else '—'
-        lines.append(f'{name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}% {sig}')
+
+        if buy_ok:
+            sig = '买入'
+        else:
+            sig = '持有'
+
+        lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%')
 
     print(f"\n{'='*50}")
     print(f"  {' '.join(lines)}")
@@ -417,7 +402,11 @@ def live_signal():
     if token: chart_url = upload_chart(token, img_bytes)
 
     # 推送
-    title = '个股 ' + ' '.join(f'{n}{"★" if any(n==b for b,_ in buy_list) else ""}' for n in STOCKS)
+    buy_names = [b for b,_ in buy_list]
+    buy_count = len(buy_names)
+    if buy_count >= 3: title = '多只买入! ' + ' '.join(buy_names)
+    elif buy_count >= 1: title = '买入: ' + ' '.join(buy_names)
+    else: title = '持有观望'
     body = '\n'.join(lines)
     send_bark(title, body, chart_url)
     print("已推送")
