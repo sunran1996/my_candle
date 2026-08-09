@@ -423,12 +423,30 @@ def live_signal():
         push_code(token)
 
     # 推送
+    # 非交易日检测
+    now = pd.Timestamp.now()
+    is_weekend = now.dayofweek >= 5  # 周六=5 周日=6
+    # 检查最新数据日期是否为今天(交易日数据会更新到今日)
+    last_data_date = raw['山东高速']['date'].iloc[-1]
+    is_trading_day = (not is_weekend) and (last_data_date.date() == now.date())
+
     buy_names = [b for b,_ in buy_list]
     buy_count = len(buy_names)
-    if buy_count >= 3: title = '多只买入! ' + ' '.join(buy_names)
-    elif buy_count >= 1: title = '买入: ' + ' '.join(buy_names)
-    else: title = '持有观望'
+
+    if not is_trading_day:
+        day_type = '周末' if is_weekend else '假日'
+        if buy_count >= 1:
+            title = f'[{day_type}] 买入: ' + ' '.join(buy_names)
+        else:
+            title = f'[{day_type}] 持有观望 (非交易日)'
+    else:
+        if buy_count >= 3: title = '多只买入! ' + ' '.join(buy_names)
+        elif buy_count >= 1: title = '买入: ' + ' '.join(buy_names)
+        else: title = '持有观望'
+
     body = '\n'.join(lines)
+    if not is_trading_day:
+        body = f'⚠️ 今日{day_type}, 以下为最近交易日信号:\n' + body
     send_bark(title, body, chart_url)
     print("已推送")
 
