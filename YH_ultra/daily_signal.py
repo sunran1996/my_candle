@@ -346,10 +346,11 @@ def push_code(token):
         print(f'  代码推送失败: {e}')
 
 def _quick_positions(raw, dfs):
-    """快速回测返回当前持仓成本 {name: entry_price}"""
+    """快速回测返回 (当前持仓, 近期交易)"""
     dates=sorted(set.intersection(*[set(d['date'])for d in dfs.values()]))
     cash=INIT;shares={n:0.0 for n in STOCKS};entry={n:0.0 for n in STOCKS};high={n:0.0 for n in STOCKS}
     accel={n:False for n in STOCKS};cooldown={n:0 for n in STOCKS}
+    all_trades=[]
     for date in dates:
         sold_today={n:False for n in STOCKS}
         px={n:raw[n][raw[n]['date']==date]['close'].iloc[0]for n in STOCKS if len(raw[n][raw[n]['date']==date])>0}
@@ -359,19 +360,20 @@ def _quick_positions(raw, dfs):
             if cp<=0 or len(r)==0:continue
             if cp>high[n]:high[n]=cp
             pnl=cp/entry[n]-1;dd=cp/high[n]-1
-            do=False;sell_px=cp
-            if pnl<=-HARD_STOP:do=True
+            do=False;sell_px=cp;why=''
+            if pnl<=-HARD_STOP:do=True;why='hard'
             elif accel[n]:
-                if pnl>=TAKE_PROFIT_HI:do=True
+                if pnl>=TAKE_PROFIT_HI:do=True;why='accel_tp25'
                 elif dd<=-TRAIL_STOP:
                     floor=entry[n]*(1+TAKE_PROFIT);stop_px=max(high[n]*(1-TRAIL_STOP),floor)
-                    if cp<=stop_px:do=True;sell_px=max(cp,floor)
-            elif dd<=-TRAIL_STOP:do=True
+                    if cp<=stop_px:do=True;sell_px=max(cp,floor);why='accel_floor'
+            elif dd<=-TRAIL_STOP:do=True;why='trail'
             elif pnl>=TAKE_PROFIT:
                 d2=r.iloc[0].get('bb_up_d2')
                 if not pd.isna(d2) and d2>0:accel[n]=True
-                else:do=True
+                else:do=True;why='tp20'
             if do:
+                all_trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,'pnl':(sell_px/entry[n]-1)*100,'why':why})
                 cash+=shares[n]*sell_px*(1-COMM-SLIP)
                 shares[n]=0;entry[n]=0;high[n]=0;accel[n]=False;sold_today[n]=True
                 if sell_px/entry[n]-1<=-HARD_STOP:cooldown[n]=COOLDOWN
@@ -390,14 +392,16 @@ def _quick_positions(raw, dfs):
             if val>5000:
                 qty=val/cp*(1-COMM-SLIP);shares[n]=qty;cash-=val
                 entry[n]=cp;high[n]=cp
-    return {n:entry[n] for n in STOCKS}
+                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'RSI{dfs[n].iloc[-1]["rsi"]:.0f}'})
+    recent=[t for t in all_trades if (pd.Timestamp.now()-t['date']).days<365][-20:]
+    return {n:entry[n] for n in STOCKS}, recent
 
 def live_signal():
     print("获取数据...")
     raw = fetch(); dfs = {n: add_indicators(d) for n, d in raw.items()}
 
-    # ── 快速回测获取当前持仓 ──
-    positions = _quick_positions(raw, dfs)
+    # ── 快速回测获取当前持仓+交易记录 ──
+    positions, recent_trades = _quick_positions(raw, dfs)
     held = [(n, (dfs[n]['close'].iloc[-1]/pos-1)*100) for n, pos in positions.items() if pos > 0]
     if held:
         info = ', '.join(f'{n}({pnl:+.1f}%)' for n, pnl in held)
@@ -450,12 +454,14 @@ def live_signal():
     print(f"  {' '.join(lines)}")
     print(f"{'='*50}")
 
-    # 简版K线图
-    fig, axes = plt.subplots(len(STOCKS), 1, figsize=(8, 2.5*len(STOCKS)), facecolor='white')
-    if len(STOCKS)==1: axes = [axes]
+    # 简版K线图 + 买卖点 + 统计面板
+    fig, axes = plt.subplots(len(STOCKS)+1, 1, figsize=(9, 2.5*(len(STOCKS)+1)), facecolor='white',
+        gridspec_kw={'height_ratios':[1]*len(STOCKS)+[0.8]})
     cn_c = mpf.make_marketcolors(up='#CC0000', down='#008800', edge='inherit', wick='inherit', volume='inherit')
     cn_s = mpf.make_mpf_style(marketcolors=cn_c, gridstyle='',
                                rc={'font.sans-serif':[CN],'axes.unicode_minus':False})
+
+    # 每只股票K线+买卖点
     for idx, name in enumerate(STOCKS):
         ax = axes[idx]
         ohlc = raw[name].tail(90).copy()
@@ -468,8 +474,71 @@ def live_signal():
         ax.plot(x, bb['bb_lo'].values[-len(ohlc):], color='#9B59B6', lw=0.5, ls='--', alpha=0.5)
         row = dfs[name].iloc[-1]; px = row['close']; rsi = row['rsi']
         chg = (raw[name]['close'].iloc[-1]/raw[name]['close'].iloc[-2]-1)*100 if len(raw[name])>1 else 0
-        ax.set_title(f'{name} {px:.2f} {chg:+.2f}% RSI{rsi:.0f}', fontsize=11, fontweight='bold')
+
+        # 标注近期买卖点
+        ohlc_dates = ohlc.index
+        for t in recent_trades:
+            if t['name'] != name: continue
+            td = pd.Timestamp(t['date'])
+            for j, d in enumerate(ohlc_dates):
+                if pd.Timestamp(d).date() == td.date():
+                    if t['dir'] == 'BUY':
+                        ax.scatter(j, ohlc['Low'].iloc[j], color='red', s=80, marker='^',
+                                  zorder=10, edgecolors='white', lw=1.5)
+                    else:
+                        ax.scatter(j, ohlc['High'].iloc[j], color='green', s=80, marker='v',
+                                  zorder=10, edgecolors='white', lw=1.5)
+                    break
+
+        holding = positions.get(name, 0) > 0
+        status = f'持仓 +{(px/positions[name]-1)*100:+.1f}%' if holding else '空仓'
+        ax.set_title(f'{name} {px:.2f} {chg:+.2f}% RSI{rsi:.0f} | {status}', fontsize=11, fontweight='bold',
+                    color='#CC0000' if holding else '#333333')
         ax.tick_params(labelsize=7); ax.grid(True, alpha=0.1)
+
+    # 第五面板: 统计
+    ax5 = axes[-1]
+    ax5.axis('off')
+    from matplotlib.patches import FancyBboxPatch
+    rows_data = []
+    total_pnl = 0
+    for name in STOCKS:
+        row = dfs[name].iloc[-1]; cp = row['close']
+        holding = positions.get(name, 0) > 0
+        if holding:
+            entry_px = positions[name]; pnl_pct = (cp/entry_px-1)*100
+            # 统计该股票历史交易
+            stock_trades = [t for t in recent_trades if t['name']==name and t['dir']=='SELL']
+            hist_wins = sum(1 for t in stock_trades if t['pnl']>0)
+            hist_total = len(stock_trades)
+            hist_wr = f'{hist_wins}/{hist_total}' if hist_total>0 else '-'
+            rows_data.append([name, f'{cp:.2f}', f'{entry_px:.2f}', f'{pnl_pct:+.1f}%',
+                            f'{hist_wr}', '持仓中'])
+            total_pnl += pnl_pct
+        else:
+            stock_trades = [t for t in recent_trades if t['name']==name and t['dir']=='SELL']
+            hist_wins = sum(1 for t in stock_trades if t['pnl']>0)
+            hist_total = len(stock_trades)
+            hist_wr = f'{hist_wins}/{hist_total}' if hist_total>0 else '-'
+            rows_data.append([name, f'{cp:.2f}', '-', '-', f'{hist_wr}', '空仓'])
+
+    # 绘制表格
+    col_labels = ['标的', '现价', '成本', '浮动盈亏', '历史胜率', '状态']
+    table = ax5.table(cellText=rows_data, colLabels=col_labels, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1, 1.5)
+    for key, cell in table.get_celld().items():
+        cell.set_edgecolor('#DDDDDD')
+        if key[0] == 0:  # header
+            cell.set_facecolor('#F5F5F5')
+            cell.set_text_props(fontweight='bold')
+        elif rows_data[key[0]-1][-1] == '持仓中':
+            cell.set_facecolor('#FFF3F3')  # 淡红底
+
+    status_line = f'总浮动盈亏: {total_pnl:+.1f}% | 持仓{sum(1 for p in positions.values() if p>0)}只' if total_pnl!=0 else '全部空仓'
+    ax5.set_title(status_line, fontsize=11, fontweight='bold', loc='left', pad=10)
+
     buf = io.BytesIO()
     fig.savefig(buf, dpi=120, bbox_inches='tight', facecolor='white')
     plt.close(fig)
