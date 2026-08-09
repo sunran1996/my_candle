@@ -455,8 +455,8 @@ def live_signal():
     print(f"{'='*50}")
 
     # 简版K线图 + 买卖点 + 统计面板
-    fig, axes = plt.subplots(len(STOCKS)+1, 1, figsize=(9, 2.5*(len(STOCKS)+1)), facecolor='white',
-        gridspec_kw={'height_ratios':[1]*len(STOCKS)+[0.8]})
+    fig, axes = plt.subplots(len(STOCKS)+1, 1, figsize=(9, 2.7*(len(STOCKS)+1)), facecolor='white',
+        gridspec_kw={'height_ratios':[1]*len(STOCKS)+[0.8], 'hspace': 0.35})
     cn_c = mpf.make_marketcolors(up='#CC0000', down='#008800', edge='inherit', wick='inherit', volume='inherit')
     cn_s = mpf.make_mpf_style(marketcolors=cn_c, gridstyle='',
                                rc={'font.sans-serif':[CN],'axes.unicode_minus':False})
