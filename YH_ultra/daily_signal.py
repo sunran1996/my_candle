@@ -429,18 +429,19 @@ def live_signal():
         bb_pos = (close-bb_lo)/(bb_up-bb_lo)*100 if bb_range>0 else 50
 
         buy_ok, sc = check_buy(row, name)
-        if buy_ok: buy_list.append((name, sc))
+        holding = positions.get(name, 0) > 0
 
-        if buy_ok:
+        if buy_ok and not holding:
             sig = '买入'
-        elif positions.get(name, 0) > 0:
+            buy_list.append((name, sc))
+        elif holding:
             sig = '持仓'
         else:
             sig = '空仓'
 
         # 附加持仓盈亏
         extra = ''
-        if positions.get(name, 0) > 0 and not buy_ok:
+        if holding:
             pnl_h = (close / positions[name] - 1) * 100
             extra = f' (+{pnl_h:+.1f}%)'
         lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%{extra}')
