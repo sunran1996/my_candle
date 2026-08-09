@@ -314,21 +314,41 @@ def send_bark(title, body, url=''):
                    headers={'Content-Type':'application/json'}), timeout=10)
     except: pass
 
-def upload_chart(token, img_bytes):
-    ts = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
-    fn = f'chart_{ts}.png'
+def github_put(token, path, content_b64, msg):
     ctx = ssl._create_unverified_context()
     h = {'Authorization':'Bearer '+token, 'User-Agent':'YH_ultra'}
-    api = f'https://api.github.com/repos/{REPO}/contents/YH_ultra/{fn}'
+    api = f'https://api.github.com/repos/{REPO}/contents/{path}'
     try:
         r = json.loads(ur.urlopen(ur.Request(api, headers=h), timeout=10, context=ctx).read())
         sha = r.get('sha')
     except: sha = None
-    body = json.dumps({'message':'YH_ultra chart','content':base64.b64encode(img_bytes).decode('ascii'),
-                       'branch':'main', **({'sha':sha} if sha else {})}).encode()
+    body = json.dumps({'message':msg,'content':content_b64,'branch':'main',
+                       **({'sha':sha} if sha else {})}).encode()
     ur.urlopen(ur.Request(api, data=body, headers={**h, 'Content-Type':'application/json'}, method='PUT'),
                timeout=15, context=ctx)
+    return sha is not None  # True=update, False=create
+
+def upload_chart(token, img_bytes):
+    ts = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
+    fn = f'chart_{ts}.png'
+    try:
+        github_put(token, f'YH_ultra/{fn}', base64.b64encode(img_bytes).decode('ascii'), 'YH_ultra chart')
+    except Exception as e:
+        print(f'  图表上传失败: {e}')
+        return ''
     return f'https://cdn.jsdelivr.net/gh/{REPO}@main/YH_ultra/{fn}'
+
+def push_code(token):
+    self_path = os.path.abspath(__file__)
+    with open(self_path, 'rb') as f:
+        raw = f.read()
+    b64 = base64.b64encode(raw).decode('ascii')
+    # push to YH_ultra/
+    try:
+        existed = github_put(token, 'YH_ultra/daily_signal.py', b64, 'YH_ultra daily update')
+        print(f"  代码已推送 YH_ultra/daily_signal.py ({'更新' if existed else '新建'})")
+    except Exception as e:
+        print(f'  代码推送失败: {e}')
 
 def live_signal():
     print("获取数据...")
@@ -403,7 +423,9 @@ def live_signal():
             try: token = open(p).read().strip(); break
             except: pass
     chart_url = ''
-    if token: chart_url = upload_chart(token, img_bytes)
+    if token:
+        chart_url = upload_chart(token, img_bytes)
+        push_code(token)
 
     # 推送
     buy_names = [b for b,_ in buy_list]
