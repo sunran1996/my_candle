@@ -25,20 +25,18 @@ INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
 BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH', 'WtAJhZtoGpU44fAiJCfJmb']
 REPO = 'sunran1996/my_candle'
 
-# 每只股票独立买入阈值 (2019至今最优)
+# 每只股票独立买入+止盈阈值 (2019至今最优)
 BUY_PARAMS = {
-    '山东高速': {'rsi': 45, 'bb': 0.25},
-    '渝农商行': {'rsi': 30, 'bb': 0.10},
-    '皖通高速': {'rsi': 38, 'bb': 0.12},
-    '江苏银行': {'rsi': 35, 'bb': 0.10},
+    '山东高速': {'rsi': 45, 'bb': 0.25, 'tp': 0.15, 'tp_hi': 0.20},
+    '渝农商行': {'rsi': 30, 'bb': 0.10, 'tp': 0.20, 'tp_hi': 0.25},
+    '皖通高速': {'rsi': 38, 'bb': 0.12, 'tp': 0.20, 'tp_hi': 0.25},
+    '江苏银行': {'rsi': 35, 'bb': 0.10, 'tp': 0.15, 'tp_hi': 0.20},
 }
 
-# 卖出
-TAKE_PROFIT    = 0.20       # 正常止盈20%
-TAKE_PROFIT_HI = 0.25       # BB加速→提高到25%
+# 卖出 (默认值, 实际使用BUY_PARAMS中的per-stock参数)
 TRAIL_STOP     = 0.07       # 移动止损7% (最优)
 HARD_STOP      = 0.10       # 硬止损10%
-COOLDOWN       = 20          # 硬止损后冷却天数
+COOLDOWN       = 20         # 硬止损后冷却天数
 
 SCRIPT = os.path.dirname(os.path.abspath(__file__))
 
@@ -107,26 +105,29 @@ def run_backtest(start_str=None):
             if cp > high[n]: high[n] = cp
             pnl = cp / entry[n] - 1; dd = cp / high[n] - 1
 
+            tp_params = BUY_PARAMS[n]
+            tp = tp_params['tp']; tp_hi = tp_params['tp_hi']
+
             do = False; why = ''; sell_px = cp
             if pnl <= -HARD_STOP:
                 do = True; why = f'硬止损{pnl*100:+.1f}%'
             elif accel[n]:
-                # BB加速模式: 目标提到25%, 移动止损底线20%
-                if pnl >= TAKE_PROFIT_HI:
+                # BB加速模式: 目标提高到tp_hi, 移动止损底线tp
+                if pnl >= tp_hi:
                     do = True; why = f'BB加速止盈{pnl*100:+.1f}%'
                 elif dd <= -TRAIL_STOP:
-                    floor_px = entry[n] * (1 + TAKE_PROFIT)
+                    floor_px = entry[n] * (1 + tp)
                     stop_px = max(high[n] * (1 - TRAIL_STOP), floor_px)
                     if cp <= stop_px:
                         do = True
                         sell_px = max(cp, floor_px)
-                        why = f'BB加速止盈{(sell_px/entry[n]-1)*100:+.1f}%(保底20%)'
+                        why = f'BB加速止盈{(sell_px/entry[n]-1)*100:+.1f}%(保底{tp*100:.0f}%)'
             elif dd <= -TRAIL_STOP:
                 do = True; why = f'移动止损{pnl*100:+.1f}%'
-            elif pnl >= TAKE_PROFIT:
+            elif pnl >= tp:
                 d2 = r.iloc[0].get('bb_up_d2')
                 if not pd.isna(d2) and d2 > 0:
-                    accel[n] = True  # 加速→目标25%+保底20%
+                    accel[n] = True  # 加速→目标tp_hi+保底tp
                 else:
                     do = True; why = f'止盈{pnl*100:+.1f}%'
 
@@ -360,15 +361,17 @@ def _quick_positions(raw, dfs):
             if cp<=0 or len(r)==0:continue
             if cp>high[n]:high[n]=cp
             pnl=cp/entry[n]-1;dd=cp/high[n]-1
+            tp_params = BUY_PARAMS[n]
+            tp = tp_params['tp']; tp_hi = tp_params['tp_hi']
             do=False;sell_px=cp;why=''
             if pnl<=-HARD_STOP:do=True;why='hard'
             elif accel[n]:
-                if pnl>=TAKE_PROFIT_HI:do=True;why='accel_tp25'
+                if pnl>=tp_hi:do=True;why='accel_tp25'
                 elif dd<=-TRAIL_STOP:
-                    floor=entry[n]*(1+TAKE_PROFIT);stop_px=max(high[n]*(1-TRAIL_STOP),floor)
+                    floor=entry[n]*(1+tp);stop_px=max(high[n]*(1-TRAIL_STOP),floor)
                     if cp<=stop_px:do=True;sell_px=max(cp,floor);why='accel_floor'
             elif dd<=-TRAIL_STOP:do=True;why='trail'
-            elif pnl>=TAKE_PROFIT:
+            elif pnl>=tp:
                 d2=r.iloc[0].get('bb_up_d2')
                 if not pd.isna(d2) and d2>0:accel[n]=True
                 else:do=True;why='tp20'
