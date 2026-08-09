@@ -345,9 +345,65 @@ def push_code(token):
     except Exception as e:
         print(f'  代码推送失败: {e}')
 
+def _quick_positions(raw, dfs):
+    """快速回测返回当前持仓成本 {name: entry_price}"""
+    dates=sorted(set.intersection(*[set(d['date'])for d in dfs.values()]))
+    cash=INIT;shares={n:0.0 for n in STOCKS};entry={n:0.0 for n in STOCKS};high={n:0.0 for n in STOCKS}
+    accel={n:False for n in STOCKS};cooldown={n:0 for n in STOCKS}
+    for date in dates:
+        sold_today={n:False for n in STOCKS}
+        px={n:raw[n][raw[n]['date']==date]['close'].iloc[0]for n in STOCKS if len(raw[n][raw[n]['date']==date])>0}
+        for n in STOCKS:
+            if shares[n]<=0:continue
+            cp=px.get(n,0);r=dfs[n][dfs[n]['date']==date]
+            if cp<=0 or len(r)==0:continue
+            if cp>high[n]:high[n]=cp
+            pnl=cp/entry[n]-1;dd=cp/high[n]-1
+            do=False;sell_px=cp
+            if pnl<=-HARD_STOP:do=True
+            elif accel[n]:
+                if pnl>=TAKE_PROFIT_HI:do=True
+                elif dd<=-TRAIL_STOP:
+                    floor=entry[n]*(1+TAKE_PROFIT);stop_px=max(high[n]*(1-TRAIL_STOP),floor)
+                    if cp<=stop_px:do=True;sell_px=max(cp,floor)
+            elif dd<=-TRAIL_STOP:do=True
+            elif pnl>=TAKE_PROFIT:
+                d2=r.iloc[0].get('bb_up_d2')
+                if not pd.isna(d2) and d2>0:accel[n]=True
+                else:do=True
+            if do:
+                cash+=shares[n]*sell_px*(1-COMM-SLIP)
+                shares[n]=0;entry[n]=0;high[n]=0;accel[n]=False;sold_today[n]=True
+                if sell_px/entry[n]-1<=-HARD_STOP:cooldown[n]=COOLDOWN
+        nav=cash+sum(shares[n]*px.get(n,0)for n in STOCKS)
+        for n in STOCKS:
+            if cooldown[n]>0:cooldown[n]-=1
+        for n in STOCKS:
+            if sold_today[n]:continue
+            if shares[n]>0:continue
+            if cooldown[n]>0:continue
+            cp=px.get(n,0);r=dfs[n][dfs[n]['date']==date]
+            if cp<=0 or len(r)==0:continue
+            ok,sc=check_buy(r.iloc[0],n)
+            if not ok:continue
+            val=min(cash,nav*MAX_POS)
+            if val>5000:
+                qty=val/cp*(1-COMM-SLIP);shares[n]=qty;cash-=val
+                entry[n]=cp;high[n]=cp
+    return {n:entry[n] for n in STOCKS}
+
 def live_signal():
     print("获取数据...")
     raw = fetch(); dfs = {n: add_indicators(d) for n, d in raw.items()}
+
+    # ── 快速回测获取当前持仓 ──
+    positions = _quick_positions(raw, dfs)
+    held = [(n, (dfs[n]['close'].iloc[-1]/pos-1)*100) for n, pos in positions.items() if pos > 0]
+    if held:
+        info = ', '.join(f'{n}({pnl:+.1f}%)' for n, pnl in held)
+        print(f"  当前持仓: {info}")
+    else:
+        print(f"  当前持仓: 全部空仓")
 
     # 实时行情
     try:
@@ -377,10 +433,17 @@ def live_signal():
 
         if buy_ok:
             sig = '买入'
+        elif positions.get(name, 0) > 0:
+            sig = '持仓'
         else:
-            sig = '持有'
+            sig = '空仓'
 
-        lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%')
+        # 附加持仓盈亏
+        extra = ''
+        if positions.get(name, 0) > 0 and not buy_ok:
+            pnl_h = (close / positions[name] - 1) * 100
+            extra = f' (+{pnl_h:+.1f}%)'
+        lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%{extra}')
 
     print(f"\n{'='*50}")
     print(f"  {' '.join(lines)}")
@@ -432,17 +495,21 @@ def live_signal():
 
     buy_names = [b for b,_ in buy_list]
     buy_count = len(buy_names)
+    holding_count = sum(1 for p in positions.values() if p > 0)
 
     if not is_trading_day:
         day_type = '周末' if is_weekend else '假日'
         if buy_count >= 1:
             title = f'[{day_type}] 买入: ' + ' '.join(buy_names)
+        elif holding_count > 0:
+            title = f'[{day_type}] 持仓中 ({holding_count}只)'
         else:
-            title = f'[{day_type}] 持有观望 (非交易日)'
+            title = f'[{day_type}] 空仓 (非交易日)'
     else:
         if buy_count >= 3: title = '多只买入! ' + ' '.join(buy_names)
         elif buy_count >= 1: title = '买入: ' + ' '.join(buy_names)
-        else: title = '持有观望'
+        elif holding_count > 0: title = f'持仓中 ({holding_count}只)'
+        else: title = '空仓观望'
 
     body = '\n'.join(lines)
     if not is_trading_day:
