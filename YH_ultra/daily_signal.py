@@ -455,8 +455,8 @@ def live_signal():
     print(f"{'='*50}")
 
     # 简版K线图 + 买卖点 + 统计面板
-    fig, axes = plt.subplots(len(STOCKS)+1, 1, figsize=(9, 2.7*(len(STOCKS)+1)), facecolor='white',
-        gridspec_kw={'height_ratios':[1]*len(STOCKS)+[0.8], 'hspace': 0.35})
+    fig, axes = plt.subplots(len(STOCKS)+1, 1, figsize=(9, 2.9*(len(STOCKS)+1)), facecolor='white',
+        gridspec_kw={'height_ratios':[1]*len(STOCKS)+[0.8], 'hspace': 0.5})
     cn_c = mpf.make_marketcolors(up='#CC0000', down='#008800', edge='inherit', wick='inherit', volume='inherit')
     cn_s = mpf.make_mpf_style(marketcolors=cn_c, gridstyle='',
                                rc={'font.sans-serif':[CN],'axes.unicode_minus':False})
@@ -492,7 +492,7 @@ def live_signal():
 
         holding = positions.get(name, 0) > 0
         status = f'持仓 +{(px/positions[name]-1)*100:+.1f}%' if holding else '空仓'
-        ax.set_title(f'{name} {px:.2f} {chg:+.2f}% RSI{rsi:.0f} | {status}', fontsize=11, fontweight='bold',
+        ax.set_title(f'{name} {px:.2f} {chg:+.2f}% RSI{rsi:.0f} | {status}', fontsize=14, fontweight='bold',
                     color='#CC0000' if holding else '#333333')
         ax.tick_params(labelsize=7); ax.grid(True, alpha=0.1)
 
