@@ -22,7 +22,7 @@ plt.rcParams['font.sans-serif'] = [CN]; plt.rcParams['axes.unicode_minus'] = Fal
 
 STOCKS = {'山东高速': 'sh600350', '渝农商行': 'sh601077', '皖通高速': 'sh600012', '江苏银行': 'sh600919'}
 INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
-BARK_KEY = 'eoq8G58fJtDDFxHjhNueGH'
+BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH', 'WtAJhZtoGpU44fAiJCfJmb']
 REPO = 'sunran1996/my_candle'
 
 # 每只股票独立买入阈值 (2019至今最优)
@@ -302,12 +302,12 @@ def run_backtest(start_str=None):
     return ndf, td
 
 def send_bark(title, body, url=''):
-    if not BARK_KEY: return
-    try:
-        data = json.dumps({'title':title,'body':body,'url':url}).encode()
-        ur.urlopen(ur.Request(f'https://api.day.app/{BARK_KEY}', data=data,
-                   headers={'Content-Type':'application/json'}), timeout=10)
-    except: pass
+    data = json.dumps({'title':title,'body':body,'url':url}).encode()
+    for bk in BARK_KEYS:
+        try:
+            ur.urlopen(ur.Request(f'https://api.day.app/{bk}', data=data,
+                       headers={'Content-Type':'application/json'}), timeout=10)
+        except: pass
 
 def github_put(token, path, content_b64, msg):
     ctx = ssl._create_unverified_context()
