@@ -443,7 +443,7 @@ def live_signal():
         extra = ''
         if holding:
             pnl_h = (close / positions[name] - 1) * 100
-            extra = f' (+{pnl_h:+.1f}%)'
+            extra = f' ({pnl_h:+.1f}%)'
         lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%{extra}')
 
     print(f"\n{'='*50}")
