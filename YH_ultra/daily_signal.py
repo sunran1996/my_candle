@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-个股交易策略 v10: 纯均值回归
+个股交易策略 v11: 分股票优化买点
 标的: 山东高速 渝农商行 皖通高速 江苏银行
 
-买入: RSI≤42 且 BB距下轨≤25%（评≥2）
+买入: 每只股票独立RSI+BB阈值, score>=1
 卖出: 止盈+20% / 移动止损-8% / 硬止损-10%
+无缩放补仓, 亏损后等下一个正常信号
 """
 import sys, io, os, json, ssl, base64, warnings
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -25,12 +26,15 @@ INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
 BARK_KEY = 'eoq8G58fJtDDFxHjhNueGH'
 REPO = 'sunran1996/my_candle'
 
-# 买入 — 正常模式
-RSI_BUY = 42; BB_BUY = 0.25
-# 买入 — 严格模式(上笔亏损后, 阈值收紧但不要求同时满足)
-RSI_STRICT = 35; BB_STRICT = 0.18
+# 每只股票独立买入阈值 (2019至今最优)
+BUY_PARAMS = {
+    '山东高速': {'rsi': 45, 'bb': 0.25},
+    '渝农商行': {'rsi': 30, 'bb': 0.10},
+    '皖通高速': {'rsi': 38, 'bb': 0.12},
+    '江苏银行': {'rsi': 35, 'bb': 0.10},
+}
 
-# 卖出 — YH02风格
+# 卖出
 TAKE_PROFIT = 0.20         # 止盈20%
 TRAIL_STOP  = 0.08          # 移动止损8%
 HARD_STOP   = 0.10          # 硬止损10%
@@ -57,24 +61,17 @@ def add_indicators(df):
                 l.ewm(alpha=1/14,adjust=False).mean().replace(0, np.nan))
     return df
 
-def check_buy(row, strict=False):
+def check_buy(row, name):
+    """每只股票独立阈值, score>=1"""
     if pd.isna(row['bb_lo']) or pd.isna(row['rsi']): return False, 0
     rsi = row['rsi']; c = row['close']; lo = row['bb_lo']; up = row['bb_up']
     if up <= lo: return False, 0
     dist = (c - lo) / (up - lo)
-    rsi_th = RSI_STRICT if strict else RSI_BUY
-    bb_th  = BB_STRICT if strict else BB_BUY
-    rsi_ok = rsi <= rsi_th
-    bb_ok = dist <= bb_th
-    if strict:
-        # 严格模式: 阈值收紧, 必须同时满足
-        score = (1 if rsi_ok else 0) + (1 if bb_ok else 0)
-        if rsi <= 25: score += 1
-        return score >= 1, score
-    else:
-        score = (1 if rsi_ok else 0) + (1 if bb_ok else 0)
-        if rsi <= 30: score += 1
-        return score >= 1, score
+    bp = BUY_PARAMS.get(name, {'rsi': 42, 'bb': 0.25})
+    rsi_th = bp['rsi']; bb_th = bp['bb']
+    sc = (1 if rsi <= rsi_th else 0) + (1 if dist <= bb_th else 0)
+    if rsi <= 30: sc += 1
+    return sc >= 1, sc
 
 # =====================================================
 def run_backtest(start_str=None):
@@ -89,17 +86,12 @@ def run_backtest(start_str=None):
     shares = {n: 0.0 for n in STOCKS}
     entry = {n: 0.0 for n in STOCKS}
     high = {n: 0.0 for n in STOCKS}
-    loss = {n: False for n in STOCKS}  # 上笔是否亏损→触发缩放模式
-    scale_step = {n: 0 for n in STOCKS}  # 缩放模式: 0=正常, 1/2/3=第几次买入
-    scale_entry = {n: 0.0 for n in STOCKS}  # 缩放模式累计成本(算加权均价)
-    scale_high = {n: 0.0 for n in STOCKS}  # 缩放模式最高价
+    sold_today = {n: False for n in STOCKS}  # 当天卖出标记
     navs = []; trades = []
-    SCALE_PCTS = [0.30, 0.30, 0.40]  # 分三次: 30%+30%+40%=100%仓位
 
     for date in dates:
-        # 新的一天, 重置同日卖出标记
-        for n in STOCKS:
-            if scale_step[n] == -1: scale_step[n] = 0
+        # 新的一天, 重置卖出标记
+        for n in STOCKS: sold_today[n] = False
         px = {n: raw[n][raw[n]['date']==date]['close'].iloc[0]
               for n in STOCKS if len(raw[n][raw[n]['date']==date])>0}
 
@@ -120,56 +112,28 @@ def run_backtest(start_str=None):
                 cash += shares[n] * cp * (1-COMM-SLIP)
                 trades.append({'date':date,'name':n,'dir':'SELL','price':cp,
                                'pnl':pnl*100,'reason':why})
-                if pnl >= 0:
-                    scale_step[n] = 0; loss[n] = False
-                else:
-                    loss[n] = True; scale_step[n] = 0
                 shares[n] = 0; entry[n] = 0; high[n] = 0
-                scale_step[n] = -1  # 当天禁止再买同只股票
+                sold_today[n] = True
 
         nav = cash + sum(shares[n]*px.get(n,0) for n in STOCKS)
 
-        # ── 买入 ──
+        # ── 买入 (无缩放, 卖过不买) ──
         for n in STOCKS:
-            if scale_step[n] == -1: continue  # 当天卖过, 不买回
+            if sold_today[n]: continue
+            if shares[n] > 0: continue  # 已有仓位
             cp = px.get(n, 0); r = dfs[n][dfs[n]['date']==date]
             if cp <= 0 or len(r)==0: continue
 
-            in_scale = loss[n] and scale_step[n] < 3  # 缩放模式中
-            if shares[n] > 0 and not in_scale: continue  # 正常模式满仓, 不补
-            # 缩放模式中已有仓位也可以继续补
-
-            ok, sc = check_buy(r.iloc[0], strict=loss[n])
+            ok, sc = check_buy(r.iloc[0], n)
             if not ok: continue
 
-            if in_scale:
-                # 缩放模式: 按步买入
-                step = scale_step[n] + 1  # 第1/2/3次
-                pct = SCALE_PCTS[step - 1]
-                val = min(cash, nav * MAX_POS * pct)
-                if val > 5000:
-                    qty = val/cp*(1-COMM-SLIP)
-                    # 更新加权均价
-                    old_cost = entry[n] * shares[n] if shares[n] > 0 else 0
-                    shares[n] += qty; cash -= val
-                    entry[n] = (old_cost + cp * qty) / shares[n] if shares[n] > 0 else cp
-                    high[n] = max(high[n], cp) if shares[n] - qty > 0 else cp
-                    scale_step[n] = step
-                    trades.append({'date':date,'name':n,'dir':'BUY',
-                                   'price':cp,'pnl':0,
-                                   'reason':f'严补{step}/3 RSI{r.iloc[0]["rsi"]:.0f}'})
-                    if scale_step[n] >= 3:
-                        scale_step[n] = 3  # 满仓, 不再补
-            else:
-                # 正常模式: 直接满仓
-                if shares[n] > 0: continue
-                val = min(cash, nav*MAX_POS)
-                if val > 5000:
-                    qty = val/cp*(1-COMM-SLIP)
-                    shares[n] = qty; cash -= val
-                    entry[n] = cp; high[n] = cp
-                    trades.append({'date':date,'name':n,'dir':'BUY','price':cp,
-                                   'pnl':0,'reason':f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'})
+            val = min(cash, nav*MAX_POS)
+            if val > 5000:
+                qty = val/cp*(1-COMM-SLIP)
+                shares[n] = qty; cash -= val
+                entry[n] = cp; high[n] = cp
+                trades.append({'date':date,'name':n,'dir':'BUY','price':cp,
+                               'pnl':0,'reason':f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'})
 
         nav = cash + sum(shares[n]*px.get(n,0) for n in STOCKS)
         holding = [n for n in STOCKS if shares[n]>0]
@@ -190,7 +154,7 @@ def run_backtest(start_str=None):
     cpct = (ndf['hold']=='CASH').sum()/len(ndf)*100
 
     print(f"\n{'='*60}")
-    print(f"  策略v10: 纯均值回归")
+    print(f"  策略v11: 分股票优化买点 (无缩放)")
     print(f"  {'─'*40}")
     print(f"  累计: {ret:+.1f}%  年化: {ann:+.1f}%  夏普: {sr:.2f}  回撤: {mdd:+.1f}%")
     print(f"  交易: BUY{len(buys)} SELL{len(sells)}  胜率{wr:.0f}%  均盈{aw:+.1f}%  均亏{al:+.1f}%  空仓{cpct:.0f}%")
@@ -377,7 +341,7 @@ def live_signal():
         bb_range = bb_up - bb_lo
         bb_pos = (close-bb_lo)/(bb_up-bb_lo)*100 if bb_range>0 else 50
 
-        buy_ok, sc = check_buy(row)
+        buy_ok, sc = check_buy(row, name)
         if buy_ok: buy_list.append((name, sc))
 
         if buy_ok:
