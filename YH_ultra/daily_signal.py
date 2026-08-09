@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-个股交易策略 v11: 分股票优化买点
+个股交易策略 v18: TS=7%最优 + 止损冷却20天
 标的: 山东高速 渝农商行 皖通高速 江苏银行
 
-买入: 每只股票独立RSI+BB阈值, score>=1
-卖出: 止盈+20% / 移动止损-8% / 硬止损-10%
-无缩放补仓, 亏损后等下一个正常信号
+买入: 每只股票独立RSI+BB阈值 + 止损冷却20天
+卖出: 止盈+20% / BB加速→25%+保底20% / 移动止损-7% / 硬止损-10%
 """
 import sys, io, os, json, ssl, base64, warnings
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -35,9 +34,11 @@ BUY_PARAMS = {
 }
 
 # 卖出
-TAKE_PROFIT = 0.20         # 止盈20%
-TRAIL_STOP  = 0.08          # 移动止损8%
-HARD_STOP   = 0.10          # 硬止损10%
+TAKE_PROFIT    = 0.20       # 正常止盈20%
+TAKE_PROFIT_HI = 0.25       # BB加速→提高到25%
+TRAIL_STOP     = 0.07       # 移动止损7% (最优)
+HARD_STOP      = 0.10       # 硬止损10%
+COOLDOWN       = 20          # 硬止损后冷却天数
 
 SCRIPT = os.path.dirname(os.path.abspath(__file__))
 
@@ -55,7 +56,8 @@ def add_indicators(df):
     df['ma20'] = c.rolling(20).mean(); df['ma60'] = c.rolling(60).mean()
     df['bb_ma'] = c.rolling(20).mean(); df['bb_std'] = c.rolling(20).std()
     df['bb_up'] = df['bb_ma'] + 2*df['bb_std']; df['bb_lo'] = df['bb_ma'] - 2*df['bb_std']
-    df['bb_bw'] = (df['bb_up'] - df['bb_lo']) / df['bb_ma']  # 带宽
+    df['bb_up_d2'] = df['bb_up'].diff().diff()  # 上轨二阶导: >0加速扩张(趋势延续)
+    df['bb_lo_d2'] = df['bb_lo'].diff().diff()  # 下轨二阶导: <0加速下行(跌势加剧)
     d = c.diff(); g = d.clip(lower=0); l = (-d).clip(lower=0)
     df['rsi'] = 100 - 100/(1 + g.ewm(alpha=1/14,adjust=False).mean() /
                 l.ewm(alpha=1/14,adjust=False).mean().replace(0, np.nan))
@@ -86,7 +88,9 @@ def run_backtest(start_str=None):
     shares = {n: 0.0 for n in STOCKS}
     entry = {n: 0.0 for n in STOCKS}
     high = {n: 0.0 for n in STOCKS}
-    sold_today = {n: False for n in STOCKS}  # 当天卖出标记
+    accel = {n: False for n in STOCKS}    # BB加速模式(已锁定20%底线)
+    cooldown = {n: 0 for n in STOCKS}     # 止损冷却剩余天数
+    sold_today = {n: False for n in STOCKS}
     navs = []; trades = []
 
     for date in dates:
@@ -103,28 +107,55 @@ def run_backtest(start_str=None):
             if cp > high[n]: high[n] = cp
             pnl = cp / entry[n] - 1; dd = cp / high[n] - 1
 
-            do = False; why = ''
-            if pnl <= -HARD_STOP: do = True; why = f'硬止损{pnl*100:+.1f}%'
-            elif dd <= -TRAIL_STOP: do = True; why = f'移动止损{dd*100:+.1f}%'
-            elif pnl >= TAKE_PROFIT: do = True; why = f'止盈{pnl*100:+.1f}%'
+            do = False; why = ''; sell_px = cp
+            if pnl <= -HARD_STOP:
+                do = True; why = f'硬止损{pnl*100:+.1f}%'
+            elif accel[n]:
+                # BB加速模式: 目标提到25%, 移动止损底线20%
+                if pnl >= TAKE_PROFIT_HI:
+                    do = True; why = f'BB加速止盈{pnl*100:+.1f}%'
+                elif dd <= -TRAIL_STOP:
+                    floor_px = entry[n] * (1 + TAKE_PROFIT)
+                    stop_px = max(high[n] * (1 - TRAIL_STOP), floor_px)
+                    if cp <= stop_px:
+                        do = True
+                        sell_px = max(cp, floor_px)
+                        why = f'BB加速止盈{(sell_px/entry[n]-1)*100:+.1f}%(保底20%)'
+            elif dd <= -TRAIL_STOP:
+                do = True; why = f'移动止损{pnl*100:+.1f}%'
+            elif pnl >= TAKE_PROFIT:
+                d2 = r.iloc[0].get('bb_up_d2')
+                if not pd.isna(d2) and d2 > 0:
+                    accel[n] = True  # 加速→目标25%+保底20%
+                else:
+                    do = True; why = f'止盈{pnl*100:+.1f}%'
 
             if do:
-                cash += shares[n] * cp * (1-COMM-SLIP)
-                trades.append({'date':date,'name':n,'dir':'SELL','price':cp,
-                               'pnl':pnl*100,'reason':why})
-                shares[n] = 0; entry[n] = 0; high[n] = 0
+                cash += shares[n] * sell_px * (1-COMM-SLIP)
+                pnl_real = sell_px / entry[n] - 1
+                trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,
+                               'pnl':pnl_real*100,'reason':why})
+                shares[n] = 0; entry[n] = 0; high[n] = 0; accel[n] = False
                 sold_today[n] = True
+                if pnl_real <= -HARD_STOP:  # 仅硬止损触发冷却
+                    cooldown[n] = COOLDOWN
 
         nav = cash + sum(shares[n]*px.get(n,0) for n in STOCKS)
 
-        # ── 买入 (无缩放, 卖过不买) ──
+        # 冷却递减
+        for n in STOCKS:
+            if cooldown[n] > 0: cooldown[n] -= 1
+
+        # ── 买入 ──
         for n in STOCKS:
             if sold_today[n]: continue
-            if shares[n] > 0: continue  # 已有仓位
+            if shares[n] > 0: continue
+            if cooldown[n] > 0: continue  # 冷却期内不买(防接飞刀)
             cp = px.get(n, 0); r = dfs[n][dfs[n]['date']==date]
             if cp <= 0 or len(r)==0: continue
+            row = r.iloc[0]
 
-            ok, sc = check_buy(r.iloc[0], n)
+            ok, sc = check_buy(row, n)
             if not ok: continue
 
             val = min(cash, nav*MAX_POS)
@@ -132,9 +163,9 @@ def run_backtest(start_str=None):
                 qty = val/cp*(1-COMM-SLIP)
                 shares[n] = qty; cash -= val
                 entry[n] = cp; high[n] = cp
+                label = f'RSI{row["rsi"]:.0f} 评{sc}'
                 trades.append({'date':date,'name':n,'dir':'BUY','price':cp,
-                               'pnl':0,'reason':f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'})
-
+                               'pnl':0,'reason':label})
         nav = cash + sum(shares[n]*px.get(n,0) for n in STOCKS)
         holding = [n for n in STOCKS if shares[n]>0]
         navs.append({'date':date,'nav':nav,'hold':','.join(holding) if holding else 'CASH'})
@@ -154,7 +185,7 @@ def run_backtest(start_str=None):
     cpct = (ndf['hold']=='CASH').sum()/len(ndf)*100
 
     print(f"\n{'='*60}")
-    print(f"  策略v11: 分股票优化买点 (无缩放)")
+    print(f"  策略v18: TS={TRAIL_STOP*100:.0f}%+止损冷却{COOLDOWN}天")
     print(f"  {'─'*40}")
     print(f"  累计: {ret:+.1f}%  年化: {ann:+.1f}%  夏普: {sr:.2f}  回撤: {mdd:+.1f}%")
     print(f"  交易: BUY{len(buys)} SELL{len(sells)}  胜率{wr:.0f}%  均盈{aw:+.1f}%  均亏{al:+.1f}%  空仓{cpct:.0f}%")
