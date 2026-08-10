@@ -74,12 +74,13 @@ def add_indicators(df):
     return df
 
 def check_buy(row, name):
-    """每只股票独立阈值, score>=1"""
+    """每只股票独立阈值, score>=1; 无RSI/BB参数返回False(MACD驱动等)"""
+    bp = BUY_PARAMS.get(name, {'rsi': 42, 'bb': 0.25})
+    if 'rsi' not in bp or 'bb' not in bp: return False, 0
     if pd.isna(row['bb_lo']) or pd.isna(row['rsi']): return False, 0
     rsi = row['rsi']; c = row['close']; lo = row['bb_lo']; up = row['bb_up']
     if up <= lo: return False, 0
     dist = (c - lo) / (up - lo)
-    bp = BUY_PARAMS.get(name, {'rsi': 42, 'bb': 0.25})
     rsi_th = bp['rsi']; bb_th = bp['bb']
     sc = (1 if rsi <= rsi_th else 0) + (1 if dist <= bb_th else 0)
     if rsi <= 30: sc += 1
@@ -470,11 +471,11 @@ def _quick_positions(raw, dfs):
             if val>5000:
                 qty=val/cp*(1-COMM-SLIP);shares[n]=qty;cash-=val
                 entry[n]=cp;high[n]=cp
-                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'RSI{dfs[n].iloc[-1]["rsi"]:.0f}'})
+                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'})
         # 创业板 fallback
         n='创业板'
         core_held=sum(1 for nn in CORE_STOCKS if shares[nn]>0)
-        if core_held<2 and shares[n]<=0 and cooldown[n]<=0 and not sold_today.get(n,False):
+        if core_held<2 and shares[n]<=0 and cooldown[n]<=0:
             cp=px.get(n,0);r=dfs[n][dfs[n]['date']==date]
             if cp>0 and len(r)>0:
                 row=r.iloc[0]
