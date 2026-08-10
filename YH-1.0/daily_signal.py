@@ -491,14 +491,14 @@ def _quick_positions(raw, dfs):
                         entry[n]=cp;high[n]=cp
                         all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'MACD{"强" if pos_frac>0.4 else "弱"}(s{strength:.1f})'})
     recent=[t for t in all_trades if (pd.Timestamp.now()-t['date']).days<365][-20:]
-    return {n:entry[n] for n in ALL_STOCKS}, recent
+    return {n:entry[n] for n in ALL_STOCKS}, {n:shares[n] for n in ALL_STOCKS}, cash, recent
 
 def live_signal():
     print("获取数据...")
     raw = fetch(); dfs = {n: add_indicators(d) for n, d in raw.items()}
 
     # ── 快速回测获取当前持仓+交易记录 ──
-    positions, recent_trades = _quick_positions(raw, dfs)
+    positions, holdings, cash_end, recent_trades = _quick_positions(raw, dfs)
     held = [(n, (dfs[n]['close'].iloc[-1]/pos-1)*100) for n, pos in positions.items() if pos > 0]
     if held:
         info = ', '.join(f'{n}({pnl:+.1f}%)' for n, pnl in held)
@@ -559,12 +559,13 @@ def live_signal():
                                rc={'font.sans-serif':[CN],'axes.unicode_minus':False})
 
     # 每只股票K线+买卖点
+    from matplotlib.dates import DateFormatter, DayLocator
     for idx, name in enumerate(ALL_STOCKS):
         ax = axes[idx]
         ohlc = raw[name].tail(90).copy()
         ohlc = ohlc.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
         ohlc = ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
-        mpf.plot(ohlc, type='candle', ax=ax, volume=False, style=cn_s)
+        mpf.plot(ohlc, type='candle', ax=ax, volume=False, style=cn_s, datetime_format='%m-%d', xrotation=0)
         bb = dfs[name].tail(90)
         x = range(len(ohlc))
         ax.plot(x, bb['bb_up'].values[-len(ohlc):], color='#9B59B6', lw=0.5, ls='--', alpha=0.5)
@@ -572,7 +573,7 @@ def live_signal():
         row = dfs[name].iloc[-1]; px = row['close']; rsi = row['rsi']
         chg = (raw[name]['close'].iloc[-1]/raw[name]['close'].iloc[-2]-1)*100 if len(raw[name])>1 else 0
 
-        # 标注近期买卖点
+        # 标注近期买卖点 (带日期)
         ohlc_dates = ohlc.index
         for t in recent_trades:
             if t['name'] != name: continue
@@ -582,9 +583,17 @@ def live_signal():
                     if t['dir'] == 'BUY':
                         ax.scatter(j, ohlc['Low'].iloc[j], color='red', s=80, marker='^',
                                   zorder=10, edgecolors='white', lw=1.5)
+                        ax.annotate(f"{td.strftime('%m-%d')}\n{t['price']:.2f}",
+                                   (j, ohlc['Low'].iloc[j]),
+                                   textcoords='offset points', xytext=(0,-22),
+                                   fontsize=6, color='#CC0000', fontweight='bold', ha='center')
                     else:
                         ax.scatter(j, ohlc['High'].iloc[j], color='green', s=80, marker='v',
                                   zorder=10, edgecolors='white', lw=1.5)
+                        ax.annotate(f"{td.strftime('%m-%d')}\n{t['pnl']:+.1f}%",
+                                   (j, ohlc['High'].iloc[j]),
+                                   textcoords='offset points', xytext=(0,12),
+                                   fontsize=6, color='#008800', fontweight='bold', ha='center')
                     break
 
         holding = positions.get(name, 0) > 0
@@ -593,25 +602,28 @@ def live_signal():
                     color='#CC0000' if holding else '#333333')
         ax.tick_params(labelsize=7); ax.grid(True, alpha=0.1)
 
-    # 第五面板: 统计
+    # 第五面板: 统计 (加权总浮动盈亏)
     ax5 = axes[-1]
     ax5.axis('off')
     from matplotlib.patches import FancyBboxPatch
     rows_data = []
-    total_pnl = 0
+    total_mv = 0; total_cost = 0
     for name in ALL_STOCKS:
         row = dfs[name].iloc[-1]; cp = row['close']
         holding = positions.get(name, 0) > 0
         if holding:
-            entry_px = positions[name]; pnl_pct = (cp/entry_px-1)*100
+            entry_px = positions[name]
+            sh = holdings[name]
+            pnl_pct = (cp/entry_px-1)*100
+            mv = sh * cp; cost = sh * entry_px
+            total_mv += mv; total_cost += cost
             # 统计该股票历史交易
             stock_trades = [t for t in recent_trades if t['name']==name and t['dir']=='SELL']
             hist_wins = sum(1 for t in stock_trades if t['pnl']>0)
             hist_total = len(stock_trades)
             hist_wr = f'{hist_wins}/{hist_total}' if hist_total>0 else '-'
             rows_data.append([name, f'{cp:.2f}', f'{entry_px:.2f}', f'{pnl_pct:+.1f}%',
-                            f'{hist_wr}', '持仓中'])
-            total_pnl += pnl_pct
+                            f'{hist_wr}', f'{mv:,.0f}'])
         else:
             stock_trades = [t for t in recent_trades if t['name']==name and t['dir']=='SELL']
             hist_wins = sum(1 for t in stock_trades if t['pnl']>0)
@@ -619,8 +631,11 @@ def live_signal():
             hist_wr = f'{hist_wins}/{hist_total}' if hist_total>0 else '-'
             rows_data.append([name, f'{cp:.2f}', '-', '-', f'{hist_wr}', '空仓'])
 
+    # 总浮动盈亏 = (总市值 - 总成本) / 总成本
+    total_pnl_pct = (total_mv/total_cost-1)*100 if total_cost>0 else 0
+
     # 绘制表格
-    col_labels = ['标的', '现价', '成本', '浮动盈亏', '历史胜率', '状态']
+    col_labels = ['标的', '现价', '成本', '盈亏%', '历史胜率', '市值']
     table = ax5.table(cellText=rows_data, colLabels=col_labels, loc='center', cellLoc='center')
     table.auto_set_font_size(False)
     table.set_fontsize(9)
@@ -630,10 +645,13 @@ def live_signal():
         if key[0] == 0:  # header
             cell.set_facecolor('#F5F5F5')
             cell.set_text_props(fontweight='bold')
-        elif rows_data[key[0]-1][-1] == '持仓中':
+        elif rows_data[key[0]-1][-1] == '空仓':
+            pass
+        else:
             cell.set_facecolor('#FFF3F3')  # 淡红底
 
-    status_line = f'总浮动盈亏: {total_pnl:+.1f}% | 持仓{sum(1 for p in positions.values() if p>0)}只' if total_pnl!=0 else '全部空仓'
+    cash_str = f'现金 {cash_end:,.0f}' if cash_end>0 else ''
+    status_line = f'总浮动盈亏: {total_pnl_pct:+.1f}% | 持仓{sum(1 for p in positions.values() if p>0)}只 | 总市值{total_mv:,.0f} | {cash_str}' if total_mv>0 else '全部空仓'
     ax5.set_title(status_line, fontsize=11, fontweight='bold', loc='left', pad=10)
 
     buf = io.BytesIO()
