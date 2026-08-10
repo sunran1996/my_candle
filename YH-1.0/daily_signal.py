@@ -121,7 +121,7 @@ def run_backtest(start_str=None):
             tp_params = BUY_PARAMS[n]
             tp = tp_params['tp']; tp_hi = tp_params['tp_hi']
 
-            do = False; why = ''; sell_px = cp
+            do = False; why = ''; sell_px = cp; is_trail = False
             if pnl <= -HARD_STOP:
                 do = True; why = f'硬止损{pnl*100:+.1f}%'
             elif accel[n]:
@@ -132,17 +132,27 @@ def run_backtest(start_str=None):
                     floor_px = entry[n] * (1 + tp)
                     stop_px = max(high[n] * (1 - TRAIL_STOP), floor_px)
                     if cp <= stop_px:
-                        do = True
+                        do = True; is_trail = True
                         sell_px = max(cp, floor_px)
                         why = f'BB加速止盈{(sell_px/entry[n]-1)*100:+.1f}%(保底{tp*100:.0f}%)'
             elif dd <= -TRAIL_STOP:
-                do = True; why = f'移动止损{pnl*100:+.1f}%'
+                do = True; is_trail = True; why = f'移动止损{pnl*100:+.1f}%'
             elif pnl >= tp:
                 d2 = r.iloc[0].get('bb_up_d2')
                 if not pd.isna(d2) and d2 > 0:
                     accel[n] = True  # 加速→目标tp_hi+保底tp
                 else:
                     do = True; why = f'止盈{pnl*100:+.1f}%'
+
+            # 移动止损日若同时触发买入信号 → 不卖, 继续持有
+            if do and is_trail:
+                if n in CORE_STOCKS:
+                    buy_ok, _ = check_buy(r.iloc[0], n)
+                else:  # 创业板: MACD金叉即买入信号
+                    dif = r.iloc[0].get('macd_dif'); dea = r.iloc[0].get('macd_dea')
+                    buy_ok = (not pd.isna(dif)) and (not pd.isna(dea)) and dif > dea
+                if buy_ok:
+                    do = False
 
             if do:
                 cash += shares[n] * sell_px * (1-COMM-SLIP)
@@ -423,18 +433,25 @@ def _quick_positions(raw, dfs):
             pnl=cp/entry[n]-1;dd=cp/high[n]-1
             tp_params = BUY_PARAMS[n]
             tp = tp_params['tp']; tp_hi = tp_params['tp_hi']
-            do=False;sell_px=cp;why=''
+            do=False;sell_px=cp;why='';is_trail=False
             if pnl<=-HARD_STOP:do=True;why='hard'
             elif accel[n]:
                 if pnl>=tp_hi:do=True;why='accel_tp25'
                 elif dd<=-TRAIL_STOP:
                     floor=entry[n]*(1+tp);stop_px=max(high[n]*(1-TRAIL_STOP),floor)
-                    if cp<=stop_px:do=True;sell_px=max(cp,floor);why='accel_floor'
-            elif dd<=-TRAIL_STOP:do=True;why='trail'
+                    if cp<=stop_px:do=True;is_trail=True;sell_px=max(cp,floor);why='accel_floor'
+            elif dd<=-TRAIL_STOP:do=True;is_trail=True;why='trail'
             elif pnl>=tp:
                 d2=r.iloc[0].get('bb_up_d2')
                 if not pd.isna(d2) and d2>0:accel[n]=True
                 else:do=True;why='tp20'
+            if do and is_trail:
+                if n in CORE_STOCKS:
+                    buy_ok,_=check_buy(r.iloc[0],n)
+                else:
+                    dif=r.iloc[0].get('macd_dif');dea=r.iloc[0].get('macd_dea')
+                    buy_ok=(not pd.isna(dif))and(not pd.isna(dea))and dif>dea
+                if buy_ok:do=False
             if do:
                 all_trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,'pnl':(sell_px/entry[n]-1)*100,'why':why})
                 cash+=shares[n]*sell_px*(1-COMM-SLIP)
