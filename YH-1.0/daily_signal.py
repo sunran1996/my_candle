@@ -25,7 +25,7 @@ ETF_STOCKS = {'创业板': 'sz159915'}
 ALL_STOCKS = {**CORE_STOCKS, **ETF_STOCKS}
 
 INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
-BARK_KEYS = []  # 调试期关闭Bark
+BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH']  # 仅推送给第一个用户
 REPO = 'sunran1996/my_candle'
 
 # 每只股票独立买入+止盈阈值 (2019至今最优)
@@ -41,6 +41,10 @@ BUY_PARAMS = {
 TRAIL_STOP     = 0.07       # 移动止损7% (最优)
 HARD_STOP      = 0.10       # 硬止损10%
 COOLDOWN       = 20         # 硬止损后冷却天数
+MAX_POS_BOOST  = 0.35       # 连亏≥2 + 有其他持仓 → 加仓35%
+MAX_POS_DOUBLE = 0.50       # 连亏≥4 + 有其他持仓 → 翻倍50%
+LOSS_STREAK_N  = 2          # 连续止损N次触发加仓
+MONTHLY_INJECT = 20000      # 每月定投2w
 
 SCRIPT = os.path.dirname(os.path.abspath(__file__))
 
@@ -101,10 +105,20 @@ def run_backtest(start_str=None):
     high = {n: 0.0 for n in ALL_STOCKS}
     accel = {n: False for n in ALL_STOCKS}    # BB加速模式(已锁定20%底线)
     cooldown = {n: 0 for n in ALL_STOCKS}     # 止损冷却剩余天数
+    loss_streak = {n: 0 for n in ALL_STOCKS}  # 连续止损计数
     sold_today = {n: False for n in ALL_STOCKS}
+    last_inject_month = None
+    total_injected = INIT
+    stock_pnl_dollar = {n: 0.0 for n in ALL_STOCKS}
     navs = []; trades = []
 
     for date in dates:
+        # 每月定投
+        if last_inject_month is not None and date.month != last_inject_month:
+            cash += MONTHLY_INJECT
+            total_injected += MONTHLY_INJECT
+        last_inject_month = date.month
+
         # 新的一天, 重置卖出标记
         for n in ALL_STOCKS: sold_today[n] = False
         px = {n: raw[n][raw[n]['date']==date]['close'].iloc[0]
@@ -121,7 +135,7 @@ def run_backtest(start_str=None):
             tp_params = BUY_PARAMS[n]
             tp = tp_params['tp']; tp_hi = tp_params['tp_hi']
 
-            do = False; why = ''; sell_px = cp; is_trail = False
+            do = False; why = ''; sell_px = cp
             if pnl <= -HARD_STOP:
                 do = True; why = f'硬止损{pnl*100:+.1f}%'
             elif accel[n]:
@@ -132,11 +146,11 @@ def run_backtest(start_str=None):
                     floor_px = entry[n] * (1 + tp)
                     stop_px = max(high[n] * (1 - TRAIL_STOP), floor_px)
                     if cp <= stop_px:
-                        do = True; is_trail = True
+                        do = True
                         sell_px = max(cp, floor_px)
                         why = f'BB加速止盈{(sell_px/entry[n]-1)*100:+.1f}%(保底{tp*100:.0f}%)'
             elif dd <= -TRAIL_STOP:
-                do = True; is_trail = True; why = f'移动止损{pnl*100:+.1f}%'
+                do = True; why = f'移动止损{pnl*100:+.1f}%'
             elif pnl >= tp:
                 d2 = r.iloc[0].get('bb_up_d2')
                 if not pd.isna(d2) and d2 > 0:
@@ -144,23 +158,16 @@ def run_backtest(start_str=None):
                 else:
                     do = True; why = f'止盈{pnl*100:+.1f}%'
 
-            # 移动止损日若同时触发买入信号 → 不卖, 继续持有
-            if do and is_trail:
-                if n in CORE_STOCKS:
-                    buy_ok, _ = check_buy(r.iloc[0], n)
-                else:  # 创业板: MACD金叉即买入信号
-                    dif = r.iloc[0].get('macd_dif'); dea = r.iloc[0].get('macd_dea')
-                    buy_ok = (not pd.isna(dif)) and (not pd.isna(dea)) and dif > dea
-                if buy_ok:
-                    do = False
-
             if do:
+                stock_pnl_dollar[n] += shares[n] * (sell_px * (1-COMM-SLIP) - entry[n])
                 cash += shares[n] * sell_px * (1-COMM-SLIP)
                 pnl_real = sell_px / entry[n] - 1
                 trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,
                                'pnl':pnl_real*100,'reason':why})
                 shares[n] = 0; entry[n] = 0; high[n] = 0; accel[n] = False
                 sold_today[n] = True
+                if pnl_real > 0: loss_streak[n] = 0
+                else: loss_streak[n] += 1
                 if pnl_real <= -HARD_STOP:  # 仅硬止损触发冷却
                     cooldown[n] = COOLDOWN
 
@@ -182,7 +189,15 @@ def run_backtest(start_str=None):
             ok, sc = check_buy(row, n)
             if not ok: continue
 
-            target_val = nav * MAX_POS  # 目标买入金额
+            # 连续止损+有其他持仓 → 阶梯加仓
+            has_other = sum(1 for nn in CORE_STOCKS if nn != n and shares[nn] > 0) > 0
+            if has_other:
+                if loss_streak[n] >= 4: pos_limit = MAX_POS_DOUBLE
+                elif loss_streak[n] >= LOSS_STREAK_N: pos_limit = MAX_POS_BOOST
+                else: pos_limit = MAX_POS
+            else:
+                pos_limit = MAX_POS
+            target_val = nav * pos_limit
             if cash < target_val and '创业板' in ETF_STOCKS:
                 cy = '创业板'
                 cy_px = px.get(cy, 0)
@@ -208,14 +223,19 @@ def run_backtest(start_str=None):
                 qty = val/cp*(1-COMM-SLIP)
                 shares[n] = qty; cash -= val
                 entry[n] = cp; high[n] = cp
+                real_pct = val / nav * 100
                 label = f'RSI{row["rsi"]:.0f} 评{sc}'
+                if pos_limit >= MAX_POS_DOUBLE:
+                    label += f' 翻倍(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                elif pos_limit > MAX_POS:
+                    label += f' 加仓(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
                 trades.append({'date':date,'name':n,'dir':'BUY','price':cp,
                                'pnl':0,'reason':label})
 
         # ── 买入 第二阶段: 创业板 (持仓<2时启用, MACD驱动) ──
         core_held = sum(1 for n in CORE_STOCKS if shares[n] > 0)
         n = '创业板'
-        if core_held < 2 and shares[n] <= 0 and cooldown[n] <= 0:
+        if core_held < 4 and shares[n] <= 0 and cooldown[n] <= 0:
             cp = px.get(n, 0); r = dfs[n][dfs[n]['date']==date]
             if cp > 0 and len(r) > 0:
                 row = r.iloc[0]
@@ -227,8 +247,24 @@ def run_backtest(start_str=None):
                         strength = abs(hist) / max_hist if max_hist > 0 else 0
                     else:
                         strength = 0
-                    pos_frac = 0.50 if strength > 0.3 else 0.25
-                    label = f'MACD{"强" if pos_frac>0.4 else "弱"}(s{strength:.1f})'
+                    # 强度过滤: 太弱=噪音跳过, 太强=追高跳过
+                    if strength < 0.15: continue
+                    if strength > 1.0: continue
+                    # 仓位反向: 温和动量重仓(可靠), 强动量轻仓(防反转)
+                    if strength <= 0.5:
+                        pos_frac = 0.50; tag = '温和'
+                    else:
+                        pos_frac = 0.25; tag = '强'
+                    # 换仓保护: 核心股即将触发买入时不买
+                    near_core = False
+                    for cn in CORE_STOCKS:
+                        if shares[cn] > 0 or cooldown[cn] > 0: continue
+                        cr = dfs[cn][dfs[cn]['date']==date]
+                        if len(cr) == 0: continue
+                        ok, _ = check_buy(cr.iloc[0], cn)
+                        if ok: near_core = True; break
+                    if near_core: continue
+                    label = f'MACD{tag}(s{strength:.1f})'
                     val = min(cash, nav * pos_frac)
                     if val > 5000:
                         qty = val/cp*(1-COMM-SLIP)
@@ -255,19 +291,44 @@ def run_backtest(start_str=None):
     al = sells[sells['pnl']<0]['pnl'].mean() if len(sells[sells['pnl']<0])>0 else 0
     cpct = (ndf['hold']=='CASH').sum()/len(ndf)*100
 
+    total_ret_pct = (final/total_injected-1)*100
     print(f"\n{'='*60}")
-    print(f"  YH-1.0: TS={TRAIL_STOP*100:.0f}%+止损冷却{COOLDOWN}天")
+    print(f"  YH-1.0: TS={TRAIL_STOP*100:.0f}%+止损冷却{COOLDOWN}天 | 月投{MONTHLY_INJECT/10000:.0f}w")
     print(f"  {'─'*40}")
-    print(f"  累计: {ret:+.1f}%  年化: {ann:+.1f}%  夏普: {sr:.2f}  回撤: {mdd:+.1f}%")
+    print(f"  累计: {ret:+.1f}%  总投{total_injected/10000:.1f}w  净回报{total_ret_pct:+.1f}%  夏普: {sr:.2f}  回撤: {mdd:+.1f}%")
     print(f"  交易: BUY{len(buys)} SELL{len(sells)}  胜率{wr:.0f}%  均盈{aw:+.1f}%  均亏{al:+.1f}%  空仓{cpct:.0f}%")
 
+    # ── 每只股票独立收益 ──
+    print(f"\n  {'标的':<8} {'交易':>5} {'胜率':>6} {'均盈':>7} {'均亏':>7} {'已实现盈亏':>12}")
+    print(f"  {'─'*55}")
+    for name in ALL_STOCKS:
+        ss = sells[sells['name']==name]
+        if len(ss)==0: continue
+        sw = (ss['pnl']>0).sum()
+        sr_wr = sw/len(ss)*100
+        sr_aw = ss[ss['pnl']>0]['pnl'].mean() if sw>0 else 0
+        sr_al = ss[ss['pnl']<0]['pnl'].mean() if sw<len(ss) else 0
+        pnl_w = stock_pnl_dollar[name] / 10000
+        print(f"  {name:<8} {len(ss):>4}笔 {sr_wr:>5.0f}% {sr_aw:>+6.1f}% {sr_al:>+6.1f}% {pnl_w:>+9.1f}w")
+    print(f"  {'─'*55}")
+    print(f"  总投入: {total_injected/10000:.0f}w  终值: {final/10000:.0f}w  净回报: {(final/total_injected-1)*100:+.1f}%")
+
     ndf['year'] = ndf['date'].dt.year
-    print(f"\n  {'年份':<6} {'收益':>8} {'MaxDD':>8}")
+    print(f"\n  {'年份':<6} {'组合':>8} {'回撤':>7}  {'山东高速':>8} {'渝农商行':>8} {'皖通高速':>8} {'江苏银行':>8} {'创业板':>8}")
     for yr, grp in ndf.groupby('year'):
         if len(grp)<10: continue
         yr_ret = (grp['nav'].iloc[-1]/grp['nav'].iloc[0]-1)*100
         yr_mdd = ((grp['nav']-grp['nav'].cummax())/grp['nav'].cummax()).min()*100
-        print(f"  {yr:<6} {yr_ret:>+7.1f}% {yr_mdd:>+7.1f}%")
+        yr_sells = td[(td['dir']=='SELL') & (td['date'].dt.year==yr)]
+        parts = []
+        for name in ALL_STOCKS:
+            ss = yr_sells[yr_sells['name']==name]
+            if len(ss) > 0:
+                w = ss['pnl'].sum(); n = len(ss)
+                parts.append(f'{n}笔 {w:+.1f}%')
+            else:
+                parts.append('—')
+        print(f"  {yr:<6} {yr_ret:>+7.1f}% {yr_mdd:>+6.1f}%  {parts[0]:>8}  {parts[1]:>8}  {parts[2]:>8}  {parts[3]:>8}  {parts[4]:>8}")
 
     # ── 图表 ──
     RED = '#CC0000'; GREEN = '#008800'; PURPLE = '#9B59B6'; BLUE = '#3498DB'
@@ -276,8 +337,8 @@ def run_backtest(start_str=None):
     days = (ndf['date'].iloc[-1] - ndf['date'].iloc[0]).days
     plot_start = ndf['date'].iloc[0] if days <= 365 else ndf['date'].iloc[-1] - pd.DateOffset(years=3)
 
-    fig = plt.figure(figsize=(20, 22), facecolor='white')
-    gs = fig.add_gridspec(6, 1, height_ratios=[1.2, 2.2, 2.2, 2.2, 2.2, 1.0],
+    fig = plt.figure(figsize=(20, 25), facecolor='white')
+    gs = fig.add_gridspec(7, 1, height_ratios=[1.2, 2.2, 2.2, 2.2, 2.2, 2.2, 1.0],
                           hspace=0.22, top=0.97, bottom=0.03, left=0.05, right=0.97)
 
     nav_s = ndf['nav']/INIT; dd_s = (nav_s-nav_s.cummax())/nav_s.cummax()
@@ -302,7 +363,7 @@ def run_backtest(start_str=None):
         if t['dir']=='BUY': ax.scatter(t['date'],yv,color=c,s=50,marker='^',zorder=6,edgecolors='white',lw=1)
         else: ax.scatter(t['date'],yv,color=GREEN,s=50,marker='v',zorder=6,edgecolors='white',lw=1)
     ax.set_ylabel('净值',fontsize=10); ax.legend(fontsize=8,loc='upper left'); ax.grid(True,alpha=0.12)
-    ax.set_title(f'v9 YH02趋势延迟卖出 | +{ret:.1f}% | 年化{ann:.1f}% | 夏普{sr:.2f} | 回撤{mdd:.1f}% | {len(td)}笔 | 胜率{wr:.0f}%',
+    ax.set_title(f'YH-1.0 均值回归+创业板补位 | +{ret:.1f}% | 年化{ann:.1f}% | 夏普{sr:.2f} | 回撤{mdd:.1f}% | {len(td)}笔 | 胜率{wr:.0f}%',
                  fontsize=13, fontweight='bold')
 
     cn_c = mpf.make_marketcolors(up=RED, down=GREEN, edge='inherit', wick='inherit', volume='inherit')
@@ -343,11 +404,18 @@ def run_backtest(start_str=None):
                                    fontsize=7, color='#008800', fontweight='bold', ha='center')
                     break
         lp = ohlc['Close'].iloc[-1]; lr = dfs[name]['rsi'].iloc[-1]
+        if name == '创业板':
+            # 创业板用MACD策略, 画DIF/DEA替代BB
+            dif_vals = bb['macd_dif'].values[-len(ohlc):]
+            dea_vals = bb['macd_dea'].values[-len(ohlc):]
+            ax.plot(x, dif_vals, color=ORANGE, lw=1.0, alpha=0.8, label='DIF')
+            ax.plot(x, dea_vals, color=BLUE, lw=0.8, alpha=0.7, label='DEA')
+            ax.axhline(y=0, color=GRAY, lw=0.5, ls='-', alpha=0.3)
         ax.set_title(f'{name}  {lp:.2f}  {ohlc_dates[-1].strftime("%Y-%m-%d")}  RSI{lr:.0f}',
                     fontsize=12, fontweight='bold', color=color)
         ax.legend(fontsize=7, loc='upper left'); ax.tick_params(labelsize=7); ax.grid(True, alpha=0.1)
 
-    ax = fig.add_subplot(gs[5])
+    ax = fig.add_subplot(gs[6])
     ax.fill_between(ndf['date'], 0, dd_s*100, color='#E74C3C', alpha=0.35, step='post')
     ax.plot(ndf['date'], dd_s*100, color='#C0392B', lw=0.8)
     ax.axhline(y=-5, color=GRAY, lw=0.5, ls='--', alpha=0.5)
@@ -421,8 +489,14 @@ def _quick_positions(raw, dfs):
     dates=sorted(set.intersection(*[set(d['date'])for d in dfs.values()]))
     cash=INIT;shares={n:0.0 for n in ALL_STOCKS};entry={n:0.0 for n in ALL_STOCKS};high={n:0.0 for n in ALL_STOCKS}
     accel={n:False for n in ALL_STOCKS};cooldown={n:0 for n in ALL_STOCKS}
+    loss_streak={n:0 for n in ALL_STOCKS}
+    last_inject_month=None
     all_trades=[]
     for date in dates:
+        # 每月定投
+        if last_inject_month is not None and date.month!=last_inject_month:
+            cash+=MONTHLY_INJECT
+        last_inject_month=date.month
         sold_today={n:False for n in ALL_STOCKS}
         px={n:raw[n][raw[n]['date']==date]['close'].iloc[0]for n in ALL_STOCKS if len(raw[n][raw[n]['date']==date])>0}
         for n in ALL_STOCKS:
@@ -433,30 +507,26 @@ def _quick_positions(raw, dfs):
             pnl=cp/entry[n]-1;dd=cp/high[n]-1
             tp_params = BUY_PARAMS[n]
             tp = tp_params['tp']; tp_hi = tp_params['tp_hi']
-            do=False;sell_px=cp;why='';is_trail=False
+            do=False;sell_px=cp;why=''
             if pnl<=-HARD_STOP:do=True;why='hard'
             elif accel[n]:
                 if pnl>=tp_hi:do=True;why='accel_tp25'
                 elif dd<=-TRAIL_STOP:
                     floor=entry[n]*(1+tp);stop_px=max(high[n]*(1-TRAIL_STOP),floor)
-                    if cp<=stop_px:do=True;is_trail=True;sell_px=max(cp,floor);why='accel_floor'
-            elif dd<=-TRAIL_STOP:do=True;is_trail=True;why='trail'
+                    if cp<=stop_px:do=True;sell_px=max(cp,floor);why='accel_floor'
+            elif dd<=-TRAIL_STOP:do=True;why='trail'
             elif pnl>=tp:
                 d2=r.iloc[0].get('bb_up_d2')
                 if not pd.isna(d2) and d2>0:accel[n]=True
                 else:do=True;why='tp20'
-            if do and is_trail:
-                if n in CORE_STOCKS:
-                    buy_ok,_=check_buy(r.iloc[0],n)
-                else:
-                    dif=r.iloc[0].get('macd_dif');dea=r.iloc[0].get('macd_dea')
-                    buy_ok=(not pd.isna(dif))and(not pd.isna(dea))and dif>dea
-                if buy_ok:do=False
             if do:
-                all_trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,'pnl':(sell_px/entry[n]-1)*100,'why':why})
+                pnl_real=sell_px/entry[n]-1
+                all_trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,'pnl':pnl_real*100,'why':why})
                 cash+=shares[n]*sell_px*(1-COMM-SLIP)
                 shares[n]=0;entry[n]=0;high[n]=0;accel[n]=False;sold_today[n]=True
-                if sell_px/entry[n]-1<=-HARD_STOP:cooldown[n]=COOLDOWN
+                if pnl_real>0:loss_streak[n]=0
+                else:loss_streak[n]+=1
+                if pnl_real<=-HARD_STOP:cooldown[n]=COOLDOWN
         nav=cash+sum(shares[n]*px.get(n,0)for n in ALL_STOCKS)
         for n in ALL_STOCKS:
             if cooldown[n]>0:cooldown[n]-=1
@@ -469,7 +539,13 @@ def _quick_positions(raw, dfs):
             if cp<=0 or len(r)==0:continue
             ok,sc=check_buy(r.iloc[0],n)
             if not ok:continue
-            target_val=nav*MAX_POS
+            has_other=sum(1 for nn in CORE_STOCKS if nn!=n and shares[nn]>0)>0
+            if has_other:
+                if loss_streak[n]>=4:pos_limit=MAX_POS_DOUBLE
+                elif loss_streak[n]>=LOSS_STREAK_N:pos_limit=MAX_POS_BOOST
+                else:pos_limit=MAX_POS
+            else:pos_limit=MAX_POS
+            target_val=nav*pos_limit
             if cash<target_val and '创业板' in ETF_STOCKS:
                 cy='创业板';cy_px=px.get(cy,0)
                 if shares.get(cy,0)>0 and cy_px>0:
@@ -488,11 +564,15 @@ def _quick_positions(raw, dfs):
             if val>5000:
                 qty=val/cp*(1-COMM-SLIP);shares[n]=qty;cash-=val
                 entry[n]=cp;high[n]=cp
-                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'})
+                real_pct=val/nav*100
+                label=f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'
+                if pos_limit>=MAX_POS_DOUBLE:label+=f' 翻倍(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                elif pos_limit>MAX_POS:label+=f' 加仓(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':label})
         # 创业板 fallback
         n='创业板'
         core_held=sum(1 for nn in CORE_STOCKS if shares[nn]>0)
-        if core_held<2 and shares[n]<=0 and cooldown[n]<=0:
+        if core_held<4 and shares[n]<=0 and cooldown[n]<=0:
             cp=px.get(n,0);r=dfs[n][dfs[n]['date']==date]
             if cp>0 and len(r)>0:
                 row=r.iloc[0]
@@ -501,21 +581,35 @@ def _quick_positions(raw, dfs):
                     hist_recent=dfs[n]['macd_hist'].iloc[-40:].dropna()
                     max_hist=hist_recent.abs().max()if len(hist_recent)>10 else 0
                     strength=abs(hist)/max_hist if max_hist>0 else 0
-                    pos_frac=0.50 if strength>0.3 else 0.25
+                    # 强度过滤
+                    if strength<0.15:continue
+                    if strength>1.0:continue
+                    # 仓位反向
+                    if strength<=0.5:pos_frac=0.50;tag='温和'
+                    else:pos_frac=0.25;tag='强'
+                    # 换仓保护
+                    near_core=False
+                    for cn in CORE_STOCKS:
+                        if shares[cn]>0 or cooldown[cn]>0:continue
+                        cr=dfs[cn][dfs[cn]['date']==date]
+                        if len(cr)==0:continue
+                        ok,_=check_buy(cr.iloc[0],cn)
+                        if ok:near_core=True;break
+                    if near_core:continue
                     val=min(cash,nav*pos_frac)
                     if val>5000:
                         qty=val/cp*(1-COMM-SLIP);shares[n]=qty;cash-=val
                         entry[n]=cp;high[n]=cp
-                        all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'MACD{"强" if pos_frac>0.4 else "弱"}(s{strength:.1f})'})
+                        all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'MACD{tag}(s{strength:.1f})'})
     recent=[t for t in all_trades if (pd.Timestamp.now()-t['date']).days<365][-20:]
-    return {n:entry[n] for n in ALL_STOCKS}, {n:shares[n] for n in ALL_STOCKS}, cash, recent
+    return {n:entry[n] for n in ALL_STOCKS}, {n:shares[n] for n in ALL_STOCKS}, cash, recent, loss_streak
 
 def live_signal():
     print("获取数据...")
     raw = fetch(); dfs = {n: add_indicators(d) for n, d in raw.items()}
 
     # ── 快速回测获取当前持仓+交易记录 ──
-    positions, holdings, cash_end, recent_trades = _quick_positions(raw, dfs)
+    positions, holdings, cash_end, recent_trades, loss_streak = _quick_positions(raw, dfs)
     held = [(n, (dfs[n]['close'].iloc[-1]/pos-1)*100) for n, pos in positions.items() if pos > 0]
     if held:
         info = ', '.join(f'{n}({pnl:+.1f}%)' for n, pnl in held)
@@ -557,11 +651,15 @@ def live_signal():
         else:
             sig = '空仓'
 
-        # 附加持仓盈亏
+        # 附加持仓盈亏 + 连续亏损标记
         extra = ''
         if holding:
             pnl_h = (close / positions[name] - 1) * 100
             extra = f' ({pnl_h:+.1f}%)'
+        if loss_streak.get(name, 0) >= 4:
+            extra += f' ⚡连亏{loss_streak[name]}'
+        elif loss_streak.get(name, 0) >= 2:
+            extra += f' 连亏{loss_streak[name]}'
         lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%{extra}')
 
     print(f"\n{'='*50}")
