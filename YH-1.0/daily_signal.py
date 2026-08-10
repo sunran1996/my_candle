@@ -606,24 +606,31 @@ def live_signal():
     ax5 = axes[-1]
     ax5.axis('off')
     from matplotlib.patches import FancyBboxPatch
+    # 先算总资产
+    total_mv = 0; total_cost = 0
+    for name in ALL_STOCKS:
+        cp = dfs[name].iloc[-1]['close']
+        if positions.get(name, 0) > 0:
+            sh = holdings[name]
+            total_mv += sh * cp
+            total_cost += sh * positions[name]
+    total_asset = total_mv + cash_end
+
     rows_data = []
-    total_mv = 0; total_cost = 0; total_asset = cash_end
     for name in ALL_STOCKS:
         row = dfs[name].iloc[-1]; cp = row['close']
         holding = positions.get(name, 0) > 0
         if holding:
-            entry_px = positions[name]
-            sh = holdings[name]
+            entry_px = positions[name]; sh = holdings[name]
             pnl_pct = (cp/entry_px-1)*100
-            mv = sh * cp; cost = sh * entry_px
-            total_mv += mv; total_cost += cost; total_asset += mv
-            # 统计该股票历史交易
+            mv = sh * cp
+            weight = mv / total_asset * 100 if total_asset > 0 else 0
             stock_trades = [t for t in recent_trades if t['name']==name and t['dir']=='SELL']
             hist_wins = sum(1 for t in stock_trades if t['pnl']>0)
             hist_total = len(stock_trades)
             hist_wr = f'{hist_wins}/{hist_total}' if hist_total>0 else '-'
             rows_data.append([name, f'{cp:.2f}', f'{entry_px:.2f}', f'{pnl_pct:+.1f}%',
-                            f'{hist_wr}', '持仓中'])
+                            f'{hist_wr}', f'{weight:.1f}%'])
         else:
             stock_trades = [t for t in recent_trades if t['name']==name and t['dir']=='SELL']
             hist_wins = sum(1 for t in stock_trades if t['pnl']>0)
@@ -631,22 +638,22 @@ def live_signal():
             hist_wr = f'{hist_wins}/{hist_total}' if hist_total>0 else '-'
             rows_data.append([name, f'{cp:.2f}', '-', '-', f'{hist_wr}', '空仓'])
 
-    # 总浮动盈亏 = (总市值 - 总成本) / 总成本
     total_pnl_pct = (total_mv/total_cost-1)*100 if total_cost>0 else 0
 
-    # 绘制表格
-    col_labels = ['标的', '现价', '成本', '盈亏%', '历史胜率', '状态']
+    col_labels = ['标的', '现价', '成本', '盈亏%', '历史胜率', '占比']
     table = ax5.table(cellText=rows_data, colLabels=col_labels, loc='center', cellLoc='center')
     table.auto_set_font_size(False)
     table.set_fontsize(9)
     table.scale(1, 1.5)
     for key, cell in table.get_celld().items():
         cell.set_edgecolor('#DDDDDD')
-        if key[0] == 0:  # header
+        if key[0] == 0:
             cell.set_facecolor('#F5F5F5')
             cell.set_text_props(fontweight='bold')
-        elif rows_data[key[0]-1][-1] == '持仓中':
-            cell.set_facecolor('#FFF3F3')  # 淡红底
+        elif rows_data[key[0]-1][-1] == '空仓':
+            pass
+        else:
+            cell.set_facecolor('#FFF3F3')
 
     today_str = pd.Timestamp.now().strftime('%Y-%m-%d')
     stock_pct = total_mv/total_asset*100 if total_asset>0 else 0
