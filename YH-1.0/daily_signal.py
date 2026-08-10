@@ -793,12 +793,12 @@ def live_signal():
         push_code(token)
 
     # 推送
-    # 非交易日检测
+    # 非交易日检测: 工作日+数据不超过1天延迟=交易日
     now = pd.Timestamp.now()
     is_weekend = now.dayofweek >= 5  # 周六=5 周日=6
-    # 检查最新数据日期是否为今天(交易日数据会更新到今日)
     last_data_date = raw['山东高速']['date'].iloc[-1]
-    is_trading_day = (not is_weekend) and (last_data_date.date() == now.date())
+    data_gap = (now.date() - last_data_date.date()).days
+    is_trading_day = (not is_weekend) and data_gap <= 1
 
     buy_names = [b for b,_ in buy_list]
     buy_count = len(buy_names)
