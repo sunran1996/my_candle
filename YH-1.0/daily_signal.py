@@ -573,7 +573,7 @@ def live_signal():
         row = dfs[name].iloc[-1]; px = row['close']; rsi = row['rsi']
         chg = (raw[name]['close'].iloc[-1]/raw[name]['close'].iloc[-2]-1)*100 if len(raw[name])>1 else 0
 
-        # 标注近期买卖点 (纯标记, 不标注文字)
+        # 标注近期买卖点 (只标日期, 不标价格/收益)
         ohlc_dates = ohlc.index
         for t in recent_trades:
             if t['name'] != name: continue
@@ -583,9 +583,17 @@ def live_signal():
                     if t['dir'] == 'BUY':
                         ax.scatter(j, ohlc['Low'].iloc[j], color='red', s=80, marker='^',
                                   zorder=10, edgecolors='white', lw=1.5)
+                        ax.annotate(td.strftime('%m-%d'),
+                                   (j, ohlc['Low'].iloc[j]),
+                                   textcoords='offset points', xytext=(0,-18),
+                                   fontsize=5.5, color='#CC0000', ha='center')
                     else:
                         ax.scatter(j, ohlc['High'].iloc[j], color='green', s=80, marker='v',
                                   zorder=10, edgecolors='white', lw=1.5)
+                        ax.annotate(td.strftime('%m-%d'),
+                                   (j, ohlc['High'].iloc[j]),
+                                   textcoords='offset points', xytext=(0,10),
+                                   fontsize=5.5, color='#008800', ha='center')
                     break
 
         holding = positions.get(name, 0) > 0
