@@ -22,7 +22,7 @@ plt.rcParams['font.sans-serif'] = [CN]; plt.rcParams['axes.unicode_minus'] = Fal
 
 STOCKS = {'山东高速': 'sh600350', '渝农商行': 'sh601077', '皖通高速': 'sh600012', '江苏银行': 'sh600919'}
 INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
-BARK_KEYS = []  # 已关闭
+BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH','WtAJhZtoGpU44fAiJCfJmb']
 REPO = 'sunran1996/my_candle'
 
 # 每只股票独立买入+止盈阈值 (2019至今最优)
@@ -37,6 +37,10 @@ BUY_PARAMS = {
 TRAIL_STOP     = 0.07       # 移动止损7% (最优)
 HARD_STOP      = 0.10       # 硬止损10%
 COOLDOWN       = 20         # 硬止损后冷却天数
+MAX_POS_BOOST  = 0.35       # 连亏≥2 + 有其他持仓 → 加仓35%
+MAX_POS_DOUBLE = 0.50       # 连亏≥4 + 有其他持仓 → 翻倍50%
+LOSS_STREAK_N  = 2          # 连续止损N次触发加仓
+MONTHLY_INJECT = 20000      # 每月定投2w
 
 SCRIPT = os.path.dirname(os.path.abspath(__file__))
 
@@ -88,10 +92,20 @@ def run_backtest(start_str=None):
     high = {n: 0.0 for n in STOCKS}
     accel = {n: False for n in STOCKS}    # BB加速模式(已锁定20%底线)
     cooldown = {n: 0 for n in STOCKS}     # 止损冷却剩余天数
+    loss_streak = {n: 0 for n in STOCKS}  # 连续止损计数
     sold_today = {n: False for n in STOCKS}
+    last_inject_month = None
+    total_injected = INIT
+    stock_pnl_dollar = {n: 0.0 for n in STOCKS}  # 每只股票已实现盈亏(元)
     navs = []; trades = []
 
     for date in dates:
+        # 每月定投
+        if last_inject_month is not None and date.month != last_inject_month:
+            cash += MONTHLY_INJECT
+            total_injected += MONTHLY_INJECT
+        last_inject_month = date.month
+
         # 新的一天, 重置卖出标记
         for n in STOCKS: sold_today[n] = False
         px = {n: raw[n][raw[n]['date']==date]['close'].iloc[0]
@@ -132,12 +146,15 @@ def run_backtest(start_str=None):
                     do = True; why = f'止盈{pnl*100:+.1f}%'
 
             if do:
+                stock_pnl_dollar[n] += shares[n] * (sell_px * (1-COMM-SLIP) - entry[n])
                 cash += shares[n] * sell_px * (1-COMM-SLIP)
                 pnl_real = sell_px / entry[n] - 1
                 trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,
                                'pnl':pnl_real*100,'reason':why})
                 shares[n] = 0; entry[n] = 0; high[n] = 0; accel[n] = False
                 sold_today[n] = True
+                if pnl_real > 0: loss_streak[n] = 0
+                else: loss_streak[n] += 1
                 if pnl_real <= -HARD_STOP:  # 仅硬止损触发冷却
                     cooldown[n] = COOLDOWN
 
@@ -159,12 +176,25 @@ def run_backtest(start_str=None):
             ok, sc = check_buy(row, n)
             if not ok: continue
 
-            val = min(cash, nav*MAX_POS)
+            # 连续止损+有其他持仓 → 阶梯加仓
+            has_other = sum(1 for nn in STOCKS if nn != n and shares[nn] > 0) > 0
+            if has_other:
+                if loss_streak[n] >= 4: pos_limit = MAX_POS_DOUBLE
+                elif loss_streak[n] >= LOSS_STREAK_N: pos_limit = MAX_POS_BOOST
+                else: pos_limit = MAX_POS
+            else:
+                pos_limit = MAX_POS
+            val = min(cash, nav*pos_limit)
             if val > 5000:
                 qty = val/cp*(1-COMM-SLIP)
                 shares[n] = qty; cash -= val
                 entry[n] = cp; high[n] = cp
+                real_pct = val / nav * 100
                 label = f'RSI{row["rsi"]:.0f} 评{sc}'
+                if pos_limit >= MAX_POS_DOUBLE:
+                    label += f' 翻倍(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                elif pos_limit > MAX_POS:
+                    label += f' 加仓(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
                 trades.append({'date':date,'name':n,'dir':'BUY','price':cp,
                                'pnl':0,'reason':label})
         nav = cash + sum(shares[n]*px.get(n,0) for n in STOCKS)
@@ -185,19 +215,44 @@ def run_backtest(start_str=None):
     al = sells[sells['pnl']<0]['pnl'].mean() if len(sells[sells['pnl']<0])>0 else 0
     cpct = (ndf['hold']=='CASH').sum()/len(ndf)*100
 
+    total_ret_pct = (final/total_injected-1)*100
     print(f"\n{'='*60}")
-    print(f"  策略v18: TS={TRAIL_STOP*100:.0f}%+止损冷却{COOLDOWN}天")
+    print(f"  策略v18: TS={TRAIL_STOP*100:.0f}%+止损冷却{COOLDOWN}天 | 月投{MONTHLY_INJECT/10000:.0f}w")
     print(f"  {'─'*40}")
-    print(f"  累计: {ret:+.1f}%  年化: {ann:+.1f}%  夏普: {sr:.2f}  回撤: {mdd:+.1f}%")
+    print(f"  累计: {ret:+.1f}%  总投{total_injected/10000:.1f}w  净回报{total_ret_pct:+.1f}%  夏普: {sr:.2f}  回撤: {mdd:+.1f}%")
     print(f"  交易: BUY{len(buys)} SELL{len(sells)}  胜率{wr:.0f}%  均盈{aw:+.1f}%  均亏{al:+.1f}%  空仓{cpct:.0f}%")
 
+    # ── 每只股票独立收益 ──
+    print(f"\n  {'标的':<8} {'交易':>5} {'胜率':>6} {'均盈':>7} {'均亏':>7} {'已实现盈亏':>12}")
+    print(f"  {'─'*55}")
+    for name in STOCKS:
+        ss = sells[sells['name']==name]
+        if len(ss)==0: continue
+        sw = (ss['pnl']>0).sum()
+        sr_wr = sw/len(ss)*100
+        sr_aw = ss[ss['pnl']>0]['pnl'].mean() if sw>0 else 0
+        sr_al = ss[ss['pnl']<0]['pnl'].mean() if sw<len(ss) else 0
+        pnl_w = stock_pnl_dollar[name] / 10000
+        print(f"  {name:<8} {len(ss):>4}笔 {sr_wr:>5.0f}% {sr_aw:>+6.1f}% {sr_al:>+6.1f}% {pnl_w:>+9.1f}w")
+    print(f"  {'─'*55}")
+    print(f"  总投入: {total_injected/10000:.0f}w  终值: {final/10000:.0f}w  净回报: {(final/total_injected-1)*100:+.1f}%")
+
     ndf['year'] = ndf['date'].dt.year
-    print(f"\n  {'年份':<6} {'收益':>8} {'MaxDD':>8}")
+    print(f"\n  {'年份':<6} {'组合':>8} {'回撤':>7}  {'山东高速':>10} {'渝农商行':>10} {'皖通高速':>10} {'江苏银行':>10}")
     for yr, grp in ndf.groupby('year'):
         if len(grp)<10: continue
         yr_ret = (grp['nav'].iloc[-1]/grp['nav'].iloc[0]-1)*100
         yr_mdd = ((grp['nav']-grp['nav'].cummax())/grp['nav'].cummax()).min()*100
-        print(f"  {yr:<6} {yr_ret:>+7.1f}% {yr_mdd:>+7.1f}%")
+        yr_sells = td[(td['dir']=='SELL') & (td['date'].dt.year==yr)]
+        parts = []
+        for name in STOCKS:
+            ss = yr_sells[yr_sells['name']==name]
+            if len(ss) > 0:
+                w = ss['pnl'].sum(); n = len(ss)
+                parts.append(f'{n}笔 {w:+.1f}%')
+            else:
+                parts.append('—')
+        print(f"  {yr:<6} {yr_ret:>+7.1f}% {yr_mdd:>+6.1f}%  {parts[0]:>10}  {parts[1]:>10}  {parts[2]:>10}  {parts[3]:>10}")
 
     # ── 图表 ──
     RED = '#CC0000'; GREEN = '#008800'; PURPLE = '#9B59B6'; BLUE = '#3498DB'
@@ -351,8 +406,14 @@ def _quick_positions(raw, dfs):
     dates=sorted(set.intersection(*[set(d['date'])for d in dfs.values()]))
     cash=INIT;shares={n:0.0 for n in STOCKS};entry={n:0.0 for n in STOCKS};high={n:0.0 for n in STOCKS}
     accel={n:False for n in STOCKS};cooldown={n:0 for n in STOCKS}
+    loss_streak={n:0 for n in STOCKS}
+    last_inject_month=None
     all_trades=[]
     for date in dates:
+        # 每月定投
+        if last_inject_month is not None and date.month!=last_inject_month:
+            cash+=MONTHLY_INJECT
+        last_inject_month=date.month
         sold_today={n:False for n in STOCKS}
         px={n:raw[n][raw[n]['date']==date]['close'].iloc[0]for n in STOCKS if len(raw[n][raw[n]['date']==date])>0}
         for n in STOCKS:
@@ -376,10 +437,13 @@ def _quick_positions(raw, dfs):
                 if not pd.isna(d2) and d2>0:accel[n]=True
                 else:do=True;why='tp20'
             if do:
-                all_trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,'pnl':(sell_px/entry[n]-1)*100,'why':why})
+                pnl_real=sell_px/entry[n]-1
+                all_trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,'pnl':pnl_real*100,'why':why})
                 cash+=shares[n]*sell_px*(1-COMM-SLIP)
                 shares[n]=0;entry[n]=0;high[n]=0;accel[n]=False;sold_today[n]=True
-                if sell_px/entry[n]-1<=-HARD_STOP:cooldown[n]=COOLDOWN
+                if pnl_real>0:loss_streak[n]=0
+                else:loss_streak[n]+=1
+                if pnl_real<=-HARD_STOP:cooldown[n]=COOLDOWN
         nav=cash+sum(shares[n]*px.get(n,0)for n in STOCKS)
         for n in STOCKS:
             if cooldown[n]>0:cooldown[n]-=1
@@ -391,20 +455,30 @@ def _quick_positions(raw, dfs):
             if cp<=0 or len(r)==0:continue
             ok,sc=check_buy(r.iloc[0],n)
             if not ok:continue
-            val=min(cash,nav*MAX_POS)
+            has_other=sum(1 for nn in STOCKS if nn!=n and shares[nn]>0)>0
+            if has_other:
+                if loss_streak[n]>=4:pos_limit=MAX_POS_DOUBLE
+                elif loss_streak[n]>=LOSS_STREAK_N:pos_limit=MAX_POS_BOOST
+                else:pos_limit=MAX_POS
+            else:pos_limit=MAX_POS
+            val=min(cash,nav*pos_limit)
             if val>5000:
                 qty=val/cp*(1-COMM-SLIP);shares[n]=qty;cash-=val
                 entry[n]=cp;high[n]=cp
-                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'})
+                real_pct=val/nav*100
+                label=f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'
+                if pos_limit>=MAX_POS_DOUBLE:label+=f' 翻倍(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                elif pos_limit>MAX_POS:label+=f' 加仓(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':label})
     recent=[t for t in all_trades if (pd.Timestamp.now()-t['date']).days<365][-20:]
-    return {n:entry[n] for n in STOCKS}, {n:shares[n] for n in STOCKS}, cash, recent
+    return {n:entry[n] for n in STOCKS}, {n:shares[n] for n in STOCKS}, cash, recent, loss_streak
 
 def live_signal():
     print("获取数据...")
     raw = fetch(); dfs = {n: add_indicators(d) for n, d in raw.items()}
 
     # ── 快速回测获取当前持仓+交易记录 ──
-    positions, holdings, cash_end, recent_trades = _quick_positions(raw, dfs)
+    positions, holdings, cash_end, recent_trades, loss_streak = _quick_positions(raw, dfs)
     held = [(n, (dfs[n]['close'].iloc[-1]/pos-1)*100) for n, pos in positions.items() if pos > 0]
     if held:
         info = ', '.join(f'{n}({pnl:+.1f}%)' for n, pnl in held)
@@ -446,11 +520,15 @@ def live_signal():
         else:
             sig = '空仓'
 
-        # 附加持仓盈亏
+        # 附加持仓盈亏 + 连续亏损标记
         extra = ''
         if holding:
             pnl_h = (close / positions[name] - 1) * 100
             extra = f' ({pnl_h:+.1f}%)'
+        if loss_streak.get(name, 0) >= 4:
+            extra += f' ⚡连亏{loss_streak[name]}'
+        elif loss_streak.get(name, 0) >= 2:
+            extra += f' 连亏{loss_streak[name]}'
         lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%{extra}')
 
     print(f"\n{'='*50}")
