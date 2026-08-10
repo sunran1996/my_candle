@@ -648,9 +648,10 @@ def live_signal():
         elif rows_data[key[0]-1][-1] == '持仓中':
             cell.set_facecolor('#FFF3F3')  # 淡红底
 
+    today_str = pd.Timestamp.now().strftime('%Y-%m-%d')
     stock_pct = total_mv/total_asset*100 if total_asset>0 else 0
     cash_pct = cash_end/total_asset*100 if total_asset>0 else 0
-    status_line = f'总浮动盈亏: {total_pnl_pct:+.1f}% | 持仓{sum(1 for p in positions.values() if p>0)}只 | 股票{stock_pct:.0f}%/现金{cash_pct:.0f}%' if total_mv>0 else '全部空仓'
+    status_line = f'{today_str} | 浮动盈亏: {total_pnl_pct:+.1f}% | 持仓{sum(1 for p in positions.values() if p>0)}只 | 股票{stock_pct:.0f}%/现金{cash_pct:.0f}%' if total_mv>0 else f'{today_str} | 全部空仓'
     ax5.set_title(status_line, fontsize=11, fontweight='bold', loc='left', pad=10)
 
     buf = io.BytesIO()
