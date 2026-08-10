@@ -805,16 +805,16 @@ def live_signal():
     if not is_trading_day:
         day_type = '周末' if is_weekend else '假日'
         if buy_count >= 1:
-            title = f'[{day_type}] 买入: ' + ' '.join(buy_names)
+            title = f'YH1.0 [{day_type}] 买入: ' + ' '.join(buy_names)
         elif holding_count > 0:
-            title = f'[{day_type}] 持仓中 ({holding_count}只)'
+            title = f'YH1.0 [{day_type}] 持仓中 ({holding_count}只)'
         else:
-            title = f'[{day_type}] 空仓 (非交易日)'
+            title = f'YH1.0 [{day_type}] 空仓 (非交易日)'
     else:
-        if buy_count >= 3: title = '多只买入! ' + ' '.join(buy_names)
-        elif buy_count >= 1: title = '买入: ' + ' '.join(buy_names)
-        elif holding_count > 0: title = f'持仓中 ({holding_count}只)'
-        else: title = '空仓观望'
+        if buy_count >= 3: title = 'YH1.0 多只买入! ' + ' '.join(buy_names)
+        elif buy_count >= 1: title = 'YH1.0 买入: ' + ' '.join(buy_names)
+        elif holding_count > 0: title = f'YH1.0 持仓中 ({holding_count}只)'
+        else: title = 'YH1.0 空仓观望'
 
     body = '\n'.join(lines)
     if not is_trading_day:
