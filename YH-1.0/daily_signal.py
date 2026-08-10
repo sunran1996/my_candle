@@ -450,7 +450,7 @@ def send_bark(title, body, url=''):
 
 def github_put(token, path, content_b64, msg):
     ctx = ssl._create_unverified_context()
-    h = {'Authorization':'Bearer '+token, 'User-Agent':'YH_ultra'}
+    h = {'Authorization':'Bearer '+token, 'User-Agent':'YH-1.0'}
     api = f'https://api.github.com/repos/{REPO}/contents/{path}'
     try:
         r = json.loads(ur.urlopen(ur.Request(api, headers=h), timeout=10, context=ctx).read())
@@ -466,7 +466,7 @@ def upload_chart(token, img_bytes):
     ts = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
     fn = f'chart_{ts}.png'
     try:
-        github_put(token, f'YH-1.0/{fn}', base64.b64encode(img_bytes).decode('ascii'), 'YH_ultra chart')
+        github_put(token, f'YH-1.0/{fn}', base64.b64encode(img_bytes).decode('ascii'), 'YH-1.0 v1.0 chart')
     except Exception as e:
         print(f'  图表上传失败: {e}')
         return ''
@@ -479,8 +479,8 @@ def push_code(token):
     b64 = base64.b64encode(raw).decode('ascii')
     # push to YH-1.0/
     try:
-        existed = github_put(token, 'YH-1.0/daily_signal.py', b64, 'YH_ultra daily update')
-        print(f"  代码已推送 YH-1.0/daily_signal.py ({'更新' if existed else '新建'})")
+        existed = github_put(token, 'YH-1.0/daily_signal.py', b64, 'YH-1.0 v1.0 daily update')
+        print(f"  代码已推送 YH-1.0 v1.0 ({'更新' if existed else '新建'})")
     except Exception as e:
         print(f'  代码推送失败: {e}')
 
