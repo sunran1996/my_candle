@@ -395,16 +395,16 @@ def _quick_positions(raw, dfs):
             if val>5000:
                 qty=val/cp*(1-COMM-SLIP);shares[n]=qty;cash-=val
                 entry[n]=cp;high[n]=cp
-                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'RSI{dfs[n].iloc[-1]["rsi"]:.0f}'})
+                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'})
     recent=[t for t in all_trades if (pd.Timestamp.now()-t['date']).days<365][-20:]
-    return {n:entry[n] for n in STOCKS}, recent
+    return {n:entry[n] for n in STOCKS}, {n:shares[n] for n in STOCKS}, cash, recent
 
 def live_signal():
     print("获取数据...")
     raw = fetch(); dfs = {n: add_indicators(d) for n, d in raw.items()}
 
     # ── 快速回测获取当前持仓+交易记录 ──
-    positions, recent_trades = _quick_positions(raw, dfs)
+    positions, holdings, cash_end, recent_trades = _quick_positions(raw, dfs)
     held = [(n, (dfs[n]['close'].iloc[-1]/pos-1)*100) for n, pos in positions.items() if pos > 0]
     if held:
         info = ', '.join(f'{n}({pnl:+.1f}%)' for n, pnl in held)
@@ -470,7 +470,7 @@ def live_signal():
         ohlc = raw[name].tail(90).copy()
         ohlc = ohlc.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
         ohlc = ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
-        mpf.plot(ohlc, type='candle', ax=ax, volume=False, style=cn_s)
+        mpf.plot(ohlc, type='candle', ax=ax, volume=False, style=cn_s, datetime_format='%m-%d', xrotation=0)
         bb = dfs[name].tail(90)
         x = range(len(ohlc))
         ax.plot(x, bb['bb_up'].values[-len(ohlc):], color='#9B59B6', lw=0.5, ls='--', alpha=0.5)
@@ -478,7 +478,7 @@ def live_signal():
         row = dfs[name].iloc[-1]; px = row['close']; rsi = row['rsi']
         chg = (raw[name]['close'].iloc[-1]/raw[name]['close'].iloc[-2]-1)*100 if len(raw[name])>1 else 0
 
-        # 标注近期买卖点
+        # 标注近期买卖点 (只标日期)
         ohlc_dates = ohlc.index
         for t in recent_trades:
             if t['name'] != name: continue
@@ -488,9 +488,17 @@ def live_signal():
                     if t['dir'] == 'BUY':
                         ax.scatter(j, ohlc['Low'].iloc[j], color='red', s=80, marker='^',
                                   zorder=10, edgecolors='white', lw=1.5)
+                        ax.annotate(td.strftime('%m-%d'),
+                                   (j, ohlc['Low'].iloc[j]),
+                                   textcoords='offset points', xytext=(0,-18),
+                                   fontsize=5.5, color='#CC0000', ha='center')
                     else:
                         ax.scatter(j, ohlc['High'].iloc[j], color='green', s=80, marker='v',
                                   zorder=10, edgecolors='white', lw=1.5)
+                        ax.annotate(td.strftime('%m-%d'),
+                                   (j, ohlc['High'].iloc[j]),
+                                   textcoords='offset points', xytext=(0,10),
+                                   fontsize=5.5, color='#008800', ha='center')
                     break
 
         holding = positions.get(name, 0) > 0
@@ -499,25 +507,35 @@ def live_signal():
                     color='#CC0000' if holding else '#333333')
         ax.tick_params(labelsize=7); ax.grid(True, alpha=0.1)
 
-    # 第五面板: 统计
+    # 第五面板: 统计 (加权总浮动盈亏)
     ax5 = axes[-1]
     ax5.axis('off')
     from matplotlib.patches import FancyBboxPatch
+    # 先算总资产
+    total_mv = 0; total_cost = 0
+    for name in STOCKS:
+        cp = dfs[name].iloc[-1]['close']
+        if positions.get(name, 0) > 0:
+            sh = holdings[name]
+            total_mv += sh * cp
+            total_cost += sh * positions[name]
+    total_asset = total_mv + cash_end
+
     rows_data = []
-    total_pnl = 0
     for name in STOCKS:
         row = dfs[name].iloc[-1]; cp = row['close']
         holding = positions.get(name, 0) > 0
         if holding:
-            entry_px = positions[name]; pnl_pct = (cp/entry_px-1)*100
-            # 统计该股票历史交易
+            entry_px = positions[name]; sh = holdings[name]
+            pnl_pct = (cp/entry_px-1)*100
+            mv = sh * cp
+            weight = mv / total_asset * 100 if total_asset > 0 else 0
             stock_trades = [t for t in recent_trades if t['name']==name and t['dir']=='SELL']
             hist_wins = sum(1 for t in stock_trades if t['pnl']>0)
             hist_total = len(stock_trades)
             hist_wr = f'{hist_wins}/{hist_total}' if hist_total>0 else '-'
             rows_data.append([name, f'{cp:.2f}', f'{entry_px:.2f}', f'{pnl_pct:+.1f}%',
-                            f'{hist_wr}', '持仓中'])
-            total_pnl += pnl_pct
+                            f'{hist_wr}', f'{weight:.1f}%'])
         else:
             stock_trades = [t for t in recent_trades if t['name']==name and t['dir']=='SELL']
             hist_wins = sum(1 for t in stock_trades if t['pnl']>0)
@@ -525,21 +543,27 @@ def live_signal():
             hist_wr = f'{hist_wins}/{hist_total}' if hist_total>0 else '-'
             rows_data.append([name, f'{cp:.2f}', '-', '-', f'{hist_wr}', '空仓'])
 
-    # 绘制表格
-    col_labels = ['标的', '现价', '成本', '浮动盈亏', '历史胜率', '状态']
+    total_pnl_pct = (total_mv/total_cost-1)*100 if total_cost>0 else 0
+
+    col_labels = ['标的', '现价', '成本', '盈亏%', '历史胜率', '占比']
     table = ax5.table(cellText=rows_data, colLabels=col_labels, loc='center', cellLoc='center')
     table.auto_set_font_size(False)
     table.set_fontsize(9)
     table.scale(1, 1.5)
     for key, cell in table.get_celld().items():
         cell.set_edgecolor('#DDDDDD')
-        if key[0] == 0:  # header
+        if key[0] == 0:
             cell.set_facecolor('#F5F5F5')
             cell.set_text_props(fontweight='bold')
-        elif rows_data[key[0]-1][-1] == '持仓中':
-            cell.set_facecolor('#FFF3F3')  # 淡红底
+        elif rows_data[key[0]-1][-1] == '空仓':
+            pass
+        else:
+            cell.set_facecolor('#FFF3F3')
 
-    status_line = f'总浮动盈亏: {total_pnl:+.1f}% | 持仓{sum(1 for p in positions.values() if p>0)}只' if total_pnl!=0 else '全部空仓'
+    today_str = pd.Timestamp.now().strftime('%Y-%m-%d')
+    stock_pct = total_mv/total_asset*100 if total_asset>0 else 0
+    cash_pct = cash_end/total_asset*100 if total_asset>0 else 0
+    status_line = f'{today_str} | 浮动盈亏: {total_pnl_pct:+.1f}% | 持仓{sum(1 for p in positions.values() if p>0)}只 | 股票{stock_pct:.0f}%/现金{cash_pct:.0f}%' if total_mv>0 else f'{today_str} | 全部空仓'
     ax5.set_title(status_line, fontsize=11, fontweight='bold', loc='left', pad=10)
 
     buf = io.BytesIO()
