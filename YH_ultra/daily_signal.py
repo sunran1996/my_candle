@@ -357,6 +357,51 @@ def run_backtest(start_str=None):
 
     return ndf, td
 
+def fetch_realtime(stocks_dict):
+    """获取实时价格: Sina直连 → akshare → 日线收盘价"""
+    results = {}
+    code_to_name = {}
+    sina_codes = []
+    for name, sym in stocks_dict.items():
+        code = sym[2:]
+        code_to_name[code] = name
+        sina_codes.append(sym)
+
+    # 方法1: Sina JS API
+    try:
+        ctx = ssl._create_unverified_context()
+        url = 'http://hq.sinajs.cn/list=' + ','.join(sina_codes)
+        req = ur.Request(url, headers={'Referer':'https://finance.sina.com.cn'})
+        data = ur.urlopen(req, timeout=8, context=ctx).read().decode('gbk')
+        for line in data.strip().split('\n'):
+            if not line.strip() or '=' not in line: continue
+            parts = line.split('"')
+            if len(parts) < 2: continue
+            hq = parts[1].split(',')
+            if len(hq) < 4 or hq[0] == '': continue
+            code = line.split('_str_')[1].split('=')[0] if '_str_' in line else ''
+            if not code: continue
+            name = code_to_name.get(code[2:], code)
+            price = float(hq[3]) if hq[3] else 0
+            if price > 0: results[name] = price
+    except Exception: pass
+
+    # 方法2: akshare spot_em
+    missing = {n: s for n, s in stocks_dict.items() if n not in results}
+    if missing:
+        try:
+            spot = ak.stock_zh_a_spot_em()
+            for sym, name in {v: k for k, v in code_to_name.items()}.items():
+                if code_to_name.get(sym) in results: continue
+                s = spot[spot['代码'] == sym]
+                if len(s) > 0:
+                    price = float(s['最新价'].iloc[0])
+                    if price > 0: results[code_to_name[sym]] = price
+        except Exception: pass
+
+    return results
+
+
 def send_bark(title, body, url=''):
     data = json.dumps({'title':title,'body':body,'url':url}).encode()
     for bk in BARK_KEYS:
@@ -486,19 +531,19 @@ def live_signal():
     else:
         print(f"  当前持仓: 全部空仓")
 
-    # 实时行情
-    try:
-        spot = ak.stock_zh_a_spot_em()
-        code_map = {'600350':'山东高速','601077':'渝农商行','600012':'皖通高速','600919':'江苏银行'}
-        for code, name in code_map.items():
-            s = spot[spot['代码']==code]
-            if len(s)>0:
-                rt = float(s['最新价'].iloc[0])
-                raw[name].loc[raw[name].index[-1],'close'] = rt
-                raw[name].loc[raw[name].index[-1],'date'] = pd.Timestamp.now()
+    # 实时行情: Sina直连 → akshare → 日线收盘价
+    rt_prices = fetch_realtime(STOCKS)
+    updated = 0
+    for name, rt in rt_prices.items():
+        if name in raw and rt > 0:
+            raw[name].loc[raw[name].index[-1], 'close'] = rt
+            raw[name].loc[raw[name].index[-1], 'date'] = pd.Timestamp.now()
+            updated += 1
+    if updated > 0:
         dfs = {n: add_indicators(d) for n, d in raw.items()}
-        print("  实时行情已更新")
-    except: print("  实时行情失败,用日线收盘价")
+        print(f"  实时行情已更新 ({updated}/{len(STOCKS)}只)")
+    else:
+        print("  实时行情失败,用日线收盘价")
 
     lines = []
     buy_list = []
@@ -661,13 +706,10 @@ def live_signal():
         push_code(token)
 
     # 推送
-    # 非交易日检测
+    # 非交易日检测: 周末=非交易日, 工作日=交易日(不推断假日)
     now = pd.Timestamp.now()
     is_weekend = now.dayofweek >= 5  # 周六=5 周日=6
-    # 检查最新数据日期是否为今天(交易日数据会更新到今日)
-    last_data_date = raw['山东高速']['date'].iloc[-1]
-    data_gap = (now.date() - last_data_date.date()).days
-    is_trading_day = (not is_weekend) and data_gap <= 1
+    is_trading_day = not is_weekend
 
     buy_names = [b for b,_ in buy_list]
     buy_count = len(buy_names)
