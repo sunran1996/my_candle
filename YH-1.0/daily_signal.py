@@ -34,12 +34,13 @@ BUY_PARAMS = {
     '渝农商行': {'rsi': 30, 'bb': 0.10, 'tp': 0.20, 'tp_hi': 0.25},
     '皖通高速': {'rsi': 38, 'bb': 0.12, 'tp': 0.20, 'tp_hi': 0.25},
     '江苏银行': {'rsi': 35, 'bb': 0.10, 'tp': 0.15, 'tp_hi': 0.20},
-    '创业板':  {'tp': 0.10, 'tp_hi': 0.15},  # MACD驱动, 无RSI/BB, TP=10%最优
+    '创业板':  {'tp': 0.10, 'tp_hi': 0.15},  # MACD驱动, 无RSI/BB
 }
 
-# 卖出 (默认值, 实际使用BUY_PARAMS中的per-stock参数)
+# 卖出 (默认值)
 TRAIL_STOP     = 0.07       # 移动止损7% (最优)
 HARD_STOP      = 0.10       # 硬止损10%
+HARD_STOP       = 0.10       # 硬止损10%
 COOLDOWN       = 20         # 硬止损后冷却天数
 MAX_POS_BOOST  = 0.35       # 连亏≥2 + 有其他持仓 → 加仓35%
 MAX_POS_DOUBLE = 0.50       # 连亏≥4 + 有其他持仓 → 翻倍50%
@@ -139,7 +140,6 @@ def run_backtest(start_str=None):
             if pnl <= -HARD_STOP:
                 do = True; why = f'硬止损{pnl*100:+.1f}%'
             elif accel[n]:
-                # BB加速模式: 目标提高到tp_hi, 移动止损底线tp
                 if pnl >= tp_hi:
                     do = True; why = f'BB加速止盈{pnl*100:+.1f}%'
                 elif dd <= -TRAIL_STOP:
@@ -240,17 +240,18 @@ def run_backtest(start_str=None):
             if cp > 0 and len(r) > 0:
                 row = r.iloc[0]
                 dif = row.get('macd_dif'); dea = row.get('macd_dea'); hist = row.get('macd_hist')
+                ma60 = row.get('ma60')
                 if (not pd.isna(dif)) and (not pd.isna(dea)) and dif > dea:
+                    # 下跌趋势不交易: 价格在MA60下方跳过
+                    if not pd.isna(ma60) and cp < ma60: continue
                     hist_recent = dfs[n]['macd_hist'].iloc[-40:].dropna()
                     if len(hist_recent) > 10:
                         max_hist = hist_recent.abs().max()
                         strength = abs(hist) / max_hist if max_hist > 0 else 0
                     else:
                         strength = 0
-                    # 强度过滤: 太弱=噪音跳过, 太强=追高跳过
+                    # 强度过滤: 太弱跳过, 温和重仓(高胜率), 强轻仓(防反转)
                     if strength < 0.15: continue
-                    if strength > 1.0: continue
-                    # 仓位反向: 温和动量重仓(可靠), 强动量轻仓(防反转)
                     if strength <= 0.5:
                         pos_frac = 0.50; tag = '温和'
                     else:
@@ -629,13 +630,13 @@ def _quick_positions(raw, dfs):
                 row=r.iloc[0]
                 dif=row.get('macd_dif');dea=row.get('macd_dea');hist=row.get('macd_hist')
                 if (not pd.isna(dif)) and (not pd.isna(dea)) and dif>dea:
+                    ma60=row.get('ma60')
+                    if not pd.isna(ma60) and cp<ma60:continue  # 下跌趋势不交易
                     hist_recent=dfs[n]['macd_hist'].iloc[-40:].dropna()
                     max_hist=hist_recent.abs().max()if len(hist_recent)>10 else 0
                     strength=abs(hist)/max_hist if max_hist>0 else 0
-                    # 强度过滤
+                    # 强度过滤: 太弱跳过, 温和重仓(高胜率), 强轻仓(防反转)
                     if strength<0.15:continue
-                    if strength>1.0:continue
-                    # 仓位反向
                     if strength<=0.5:pos_frac=0.50;tag='温和'
                     else:pos_frac=0.25;tag='强'
                     # 换仓保护
