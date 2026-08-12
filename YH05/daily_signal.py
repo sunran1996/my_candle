@@ -294,7 +294,7 @@ def main():
                         rt=float(s['最新价'].iloc[0])
                         old=raw[name]['close'].iloc[-1]
                         raw[name].loc[raw[name].index[-1],'close']=rt
-                        raw[name].loc[raw[name].index[-1],'date']=pd.Timestamp.now()
+                        raw[name].loc[raw[name].index[-1],'date']=pd.Timestamp.now().floor('s')
                         print(f'  {name} {old:.4f}→实时{rt:.4f}')
                 df_main=add_main(raw[MAIN_NAME])
                 dfs_g={n:add_growth(d) for n,d in raw.items() if n!=MAIN_NAME}
