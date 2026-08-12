@@ -675,7 +675,7 @@ def live_signal():
     for name, rt in rt_prices.items():
         if name in raw and rt > 0:
             raw[name].loc[raw[name].index[-1], 'close'] = rt
-            raw[name].loc[raw[name].index[-1], 'date'] = pd.Timestamp.now()
+            raw[name].loc[raw[name].index[-1], 'date'] = pd.Timestamp.now().floor('s')
             updated += 1
     if updated > 0:
         dfs = {n: add_indicators(d) for n, d in raw.items()}
