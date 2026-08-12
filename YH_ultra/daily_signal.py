@@ -43,6 +43,67 @@ LOSS_STREAK_N  = 2          # 连续止损N次触发加仓
 MONTHLY_INJECT = 20000      # 每月定投2w
 
 SCRIPT = os.path.dirname(os.path.abspath(__file__))
+STATE_FILE = os.path.join(SCRIPT, '_positions.json')
+
+def load_state():
+    """加载持久化持仓状态, 无文件时返回None"""
+    if not os.path.exists(STATE_FILE):
+        return None
+    try:
+        with open(STATE_FILE, 'r', encoding='utf-8') as f:
+            s = json.load(f)
+        s['last_date'] = pd.Timestamp(s['last_date'])
+        for t in s.get('trades', []):
+            t['date'] = pd.Timestamp(t['date'])
+        return s
+    except Exception as e:
+        print(f'  加载持仓状态失败: {e}, 将重新回测')
+        return None
+
+def save_state(last_date, cash, total_injected, last_inject_month,
+               shares, entry, high, accel, cooldown, loss_streak, all_trades):
+    """保存持仓状态到本地JSON"""
+    out = {
+        'last_date': last_date.strftime('%Y-%m-%d'),
+        'cash': cash,
+        'total_injected': total_injected,
+        'last_inject_month': last_inject_month,
+        'positions': {},
+        'trades': [],
+    }
+    for n in STOCKS:
+        out['positions'][n] = {
+            'shares': shares[n],
+            'entry': entry[n],
+            'high': high[n],
+            'accel': accel[n],
+            'cooldown': cooldown[n],
+            'loss_streak': loss_streak[n],
+        }
+    for t in all_trades[-50:]:
+        out['trades'].append({
+            'date': t['date'].strftime('%Y-%m-%d'),
+            'name': t['name'],
+            'dir': t['dir'],
+            'price': t['price'],
+            'pnl': t['pnl'],
+            'why': t['why'],
+        })
+    with open(STATE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
+
+def push_state(token):
+    """推送持仓状态到GitHub"""
+    if not os.path.exists(STATE_FILE):
+        return
+    with open(STATE_FILE, 'rb') as f:
+        raw = f.read()
+    b64 = base64.b64encode(raw).decode('ascii')
+    try:
+        github_put(token, 'YH_ultra/_positions.json', b64, 'YH_ultra position state')
+        print(f'  持仓状态已推送')
+    except Exception as e:
+        print(f'  状态推送失败: {e}')
 
 # =====================================================
 def fetch():
@@ -522,8 +583,106 @@ def live_signal():
     print("获取数据...")
     raw = fetch(); dfs = {n: add_indicators(d) for n, d in raw.items()}
 
-    # ── 快速回测获取当前持仓+交易记录 ──
-    positions, holdings, cash_end, recent_trades, loss_streak = _quick_positions(raw, dfs)
+    # ── 增量回测: 从上次状态推进, 避免全量重放 ──
+    state = load_state()
+    if state is not None:
+        print(f"  加载持仓状态: {state['last_date'].strftime('%Y-%m-%d')}, "
+              f"现金{state['cash']/10000:.1f}w, "
+              f"持仓{sum(1 for p in state['positions'].values() if p['shares']>0)}只")
+        cash = state['cash']
+        total_injected = state['total_injected']
+        last_inject_month = state['last_inject_month']
+        shares = {}; entry = {}; high = {}; accel = {}; cooldown = {}; loss_streak = {}
+        for n in STOCKS:
+            ps = state['positions'][n]
+            shares[n] = ps['shares']; entry[n] = ps['entry']; high[n] = ps['high']
+            accel[n] = ps['accel']; cooldown[n] = ps['cooldown']; loss_streak[n] = ps['loss_streak']
+        all_trades = state.get('trades', [])
+        start_date = state['last_date'] + pd.Timedelta(days=1)
+        dates = sorted(set.intersection(*[set(d['date']) for d in dfs.values()]))
+        dates = [d for d in dates if d >= start_date]
+    else:
+        print("  无持仓状态, 全量回测")
+        cash = INIT; total_injected = INIT; last_inject_month = None
+        shares = {n: 0.0 for n in STOCKS}; entry = {n: 0.0 for n in STOCKS}
+        high = {n: 0.0 for n in STOCKS}; accel = {n: False for n in STOCKS}
+        cooldown = {n: 0 for n in STOCKS}; loss_streak = {n: 0 for n in STOCKS}
+        all_trades = []
+        dates = sorted(set.intersection(*[set(d['date']) for d in dfs.values()]))
+
+    # ── 推进到最新 ──
+    for date in dates:
+        if last_inject_month is not None and date.month != last_inject_month:
+            cash += MONTHLY_INJECT; total_injected += MONTHLY_INJECT
+        last_inject_month = date.month
+        sold_today = {n: False for n in STOCKS}
+        px = {n: raw[n][raw[n]['date']==date]['close'].iloc[0] for n in STOCKS if len(raw[n][raw[n]['date']==date])>0}
+        # 卖出
+        for n in STOCKS:
+            if shares[n] <= 0: continue
+            cp = px.get(n, 0); r = dfs[n][dfs[n]['date']==date]
+            if cp <= 0 or len(r)==0: continue
+            if cp > high[n]: high[n] = cp
+            pnl = cp/entry[n] - 1; dd = cp/high[n] - 1
+            tp_params = BUY_PARAMS[n]; tp = tp_params['tp']; tp_hi = tp_params['tp_hi']
+            do = False; sell_px = cp; why = ''
+            if pnl <= -HARD_STOP: do = True; why = 'hard'
+            elif accel[n]:
+                if pnl >= tp_hi: do = True; why = 'accel_tp25'
+                elif dd <= -TRAIL_STOP:
+                    floor = entry[n]*(1+tp); stop_px = max(high[n]*(1-TRAIL_STOP), floor)
+                    if cp <= stop_px: do = True; sell_px = max(cp, floor); why = 'accel_floor'
+            elif dd <= -TRAIL_STOP: do = True; why = 'trail'
+            elif pnl >= tp:
+                d2 = r.iloc[0].get('bb_up_d2')
+                if not pd.isna(d2) and d2 > 0: accel[n] = True
+                else: do = True; why = 'tp20'
+            if do:
+                pnl_real = sell_px/entry[n] - 1
+                all_trades.append({'date':date,'name':n,'dir':'SELL','price':sell_px,'pnl':pnl_real*100,'why':why})
+                cash += shares[n]*sell_px*(1-COMM-SLIP)
+                shares[n] = 0; entry[n] = 0; high[n] = 0; accel[n] = False; sold_today[n] = True
+                if pnl_real > 0: loss_streak[n] = 0
+                else: loss_streak[n] += 1
+                if pnl_real <= -HARD_STOP: cooldown[n] = COOLDOWN
+        nav = cash + sum(shares[n]*px.get(n, 0) for n in STOCKS)
+        for n in STOCKS:
+            if cooldown[n] > 0: cooldown[n] -= 1
+        # 买入
+        for n in STOCKS:
+            if sold_today[n]: continue
+            if shares[n] > 0: continue
+            if cooldown[n] > 0: continue
+            cp = px.get(n, 0); r = dfs[n][dfs[n]['date']==date]
+            if cp <= 0 or len(r)==0: continue
+            ok, sc = check_buy(r.iloc[0], n)
+            if not ok: continue
+            has_other = sum(1 for nn in STOCKS if nn != n and shares[nn] > 0) > 0
+            if has_other:
+                if loss_streak[n] >= 4: pos_limit = MAX_POS_DOUBLE
+                elif loss_streak[n] >= LOSS_STREAK_N: pos_limit = MAX_POS_BOOST
+                else: pos_limit = MAX_POS
+            else: pos_limit = MAX_POS
+            val = min(cash, nav*pos_limit)
+            if val > 5000:
+                qty = val/cp*(1-COMM-SLIP); shares[n] = qty; cash -= val
+                entry[n] = cp; high[n] = cp
+                real_pct = val/nav*100
+                label = f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'
+                if pos_limit >= MAX_POS_DOUBLE: label += f' 翻倍(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                elif pos_limit > MAX_POS: label += f' 加仓(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':label})
+
+    # ── 保存状态 ──
+    latest_date = max(dates) if dates else (state['last_date'] if state else raw['山东高速']['date'].iloc[-1])
+    save_state(latest_date, cash, total_injected, last_inject_month,
+               shares, entry, high, accel, cooldown, loss_streak, all_trades)
+
+    positions = {n: entry[n] for n in STOCKS}
+    holdings = {n: shares[n] for n in STOCKS}
+    cash_end = cash
+    recent_trades = [t for t in all_trades if (pd.Timestamp.now()-t['date']).days < 365][-20:]
+
     held = [(n, (dfs[n]['close'].iloc[-1]/pos-1)*100) for n, pos in positions.items() if pos > 0]
     if held:
         info = ', '.join(f'{n}({pnl:+.1f}%)' for n, pnl in held)
@@ -704,6 +863,7 @@ def live_signal():
     if token:
         chart_url = upload_chart(token, img_bytes)
         push_code(token)
+        push_state(token)
 
     # 推送
     # 非交易日检测: 周末=非交易日, 工作日=交易日(不推断假日)
