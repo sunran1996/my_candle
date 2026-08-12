@@ -611,6 +611,7 @@ def live_signal():
         dates = sorted(set.intersection(*[set(d['date']) for d in dfs.values()]))
 
     # ── 推进到最新 ──
+    prev_trade_count = len(all_trades)
     for date in dates:
         if last_inject_month is not None and date.month != last_inject_month:
             cash += MONTHLY_INJECT; total_injected += MONTHLY_INJECT
@@ -682,6 +683,9 @@ def live_signal():
     holdings = {n: shares[n] for n in STOCKS}
     cash_end = cash
     recent_trades = [t for t in all_trades if (pd.Timestamp.now()-t['date']).days < 365][-20:]
+    new_trades = all_trades[prev_trade_count:]
+    today_str = pd.Timestamp.now().strftime('%Y-%m-%d')
+    new_trades = [t for t in new_trades if t['date'] == today_str]
 
     held = [(n, (dfs[n]['close'].iloc[-1]/pos-1)*100) for n, pos in positions.items() if pos > 0]
     if held:
@@ -875,6 +879,22 @@ def live_signal():
     buy_count = len(buy_names)
     holding_count = sum(1 for p in positions.values() if p > 0)
 
+    # 交易变动提醒
+    alert_body = ''
+    if new_trades:
+        parts = []
+        for t in new_trades:
+            d = t['date'].strftime('%m-%d')
+            if t['dir'] == 'BUY':
+                parts.append(f"买{t['name']}")
+                alert_body += f"🔴 {d} 买入 {t['name']} @{t['price']:.2f} {t['why']}\n"
+            else:
+                pnl_s = f"{t['pnl']:+.1f}%"
+                why_cn = {'hard':'硬止损','trail':'移动止损','tp20':'止盈','accel_tp25':'BB加速止盈',
+                          'accel_floor':'BB加速保底'}.get(t['why'], t['why'])
+                parts.append(f"卖{t['name']}{pnl_s}")
+                alert_body += f"🟢 {d} 卖出 {t['name']} {pnl_s} ({why_cn})\n"
+
     if not is_trading_day:
         day_type = '周末' if is_weekend else '假日'
         if buy_count >= 1:
@@ -884,12 +904,16 @@ def live_signal():
         else:
             title = f'[{day_type}] 空仓 (非交易日)'
     else:
-        if buy_count >= 3: title = '多只买入! ' + ' '.join(buy_names)
+        if new_trades:
+            title = ' '.join(parts)
+        elif buy_count >= 3: title = '多只买入! ' + ' '.join(buy_names)
         elif buy_count >= 1: title = '买入: ' + ' '.join(buy_names)
         elif holding_count > 0: title = f'持仓中 ({holding_count}只)'
         else: title = '空仓观望'
 
     body = '\n'.join(lines)
+    if alert_body:
+        body = alert_body + '\n' + body
     if not is_trading_day:
         body = f'⚠️ 今日{day_type}, 以下为最近交易日信号:\n' + body
     send_bark(title, body, chart_url)
