@@ -20,11 +20,61 @@ GROWTH={'创业板':'sz159915'}
 BB_P=45; BB_S=2.0; RSI_P=14; RSI_L=30; RSI_H=70; ERS=65; BA=0.001
 BARK_KEYS=['eoq8G58fJtDDFxHjhNueGH','WtAJhZtoGpU44fAiJCfJmb','WdcFKWZiVMyDsiDJqoZrvj']
 REPO='sunran1996/my_candle'
+SCRIPT = os.path.dirname(os.path.abspath(__file__))
+STATE_FILE = os.path.join(SCRIPT, '_positions.json')
+
+def load_state():
+    if not os.path.exists(STATE_FILE): return None
+    try:
+        with open(STATE_FILE,'r',encoding='utf-8') as f:
+            s=json.load(f)
+        s['last_date']=pd.Timestamp(s['last_date'])
+        return s
+    except: return None
+
+def save_state(last_date,pos,shares_main,shares_cy,cash,entry_main,entry_cy,trade_list=None):
+    out={'last_date':last_date.strftime('%Y-%m-%d'),'pos':pos,
+         'shares_main':shares_main,'shares_cy':shares_cy,'cash':cash,
+         'entry_main':entry_main,'entry_cy':entry_cy,
+         'trades':trade_list[-30:] if trade_list else []}
+    with open(STATE_FILE,'w',encoding='utf-8') as f:
+        json.dump(out,f,ensure_ascii=False,indent=2)
+
+def push_state(token):
+    if not os.path.exists(STATE_FILE): return
+    with open(STATE_FILE,'rb') as f: raw=f.read()
+    try:
+        body=json.dumps({'message':'YH05 position state',
+                         'content':base64.b64encode(raw).decode('ascii'),'branch':'main'}).encode()
+        ctx=ssl._create_unverified_context()
+        h={'Authorization':'Bearer '+token,'User-Agent':'YH05'}
+        api=f'https://api.github.com/repos/{REPO}/contents/YH05/_positions.json'
+        try:
+            r=json.loads(ur.urlopen(ur.Request(api,headers=h),timeout=10,context=ctx).read())
+            body=json.dumps({'message':'YH05 position state',
+                             'content':base64.b64encode(raw).decode('ascii'),'branch':'main',
+                             'sha':r['sha']}).encode()
+        except: pass
+        ur.urlopen(ur.Request(api,data=body,headers={**h,'Content-Type':'application/json'},method='PUT'),
+                   timeout=15,context=ctx)
+        print(f'  持仓状态已推送')
+    except Exception as e: print(f'  状态推送失败: {e}')
+
+def _retry(fn,*args,retries=3,delay=5,**kwargs):
+    """网络重试: 失败后延迟递增, 最后一次仍失败才抛出"""
+    for i in range(retries):
+        try:
+            return fn(*args,**kwargs)
+        except Exception as e:
+            if i==retries-1:
+                raise
+            print(f'  网络重试 {i+1}/{retries} ({e.__class__.__name__})...')
+            time.sleep(delay*(i+1))
 
 def fetch():
     dfs={}
     for n,s in {**GROWTH,MAIN_NAME:MAIN_SYM}.items():
-        df=ak.fund_etf_hist_sina(symbol=s); df['date']=pd.to_datetime(df['date'])
+        df=_retry(ak.fund_etf_hist_sina,symbol=s); df['date']=pd.to_datetime(df['date'])
         dfs[n]=df[['date','open','high','low','close','volume']].sort_values('date').reset_index(drop=True)
     return dfs
 
@@ -53,7 +103,7 @@ def send_bark(title,body,url=''):
         except: pass
     print("已推送")
 
-def gen_chart(raw,df_main,dfs_g,both=False):
+def gen_chart(raw,df_main,dfs_g,state=None):
     """双K线图: 红利低波 + 创业板"""
     main=raw[MAIN_NAME].tail(120).copy()
     main=main.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
@@ -84,17 +134,22 @@ def gen_chart(raw,df_main,dfs_g,both=False):
 
     # 副线状态 — 在回测之后根据实际持仓pos生成
 
-    # ===== 120日迷你回测 =====
+    # ===== 迷你回测 (从持久化状态或初始状态开始) =====
     lookback=120
-    # 截取近120日数据
     main_sub=df_main.tail(lookback).reset_index(drop=True)
     cy_sub=dfs_g['创业板'].tail(lookback).reset_index(drop=True)
     main_close=raw[MAIN_NAME]['close'].tail(lookback).reset_index(drop=True)
     cy_close=raw['创业板']['close'].tail(lookback).reset_index(drop=True)
 
-    INIT=1_000_000; cash=0.0; shares_main=INIT/main_close.iloc[0]*(1-0.0003)
-    shares_cy=0.0; pos='MAIN'; peak=INIT; pbw=None; sc=2; ep=main_close.iloc[0]
-    hse=0; last_rb=None; stopped=False; navs=[]; events=[]  # events记录换仓时间
+    INIT=1_000_000
+    if state is not None and state.get('pos'):
+        cash=state.get('cash',0); shares_main=state.get('shares_main',0)
+        shares_cy=state.get('shares_cy',0); pos=state['pos']
+    else:
+        cash=0.0; shares_main=INIT/main_close.iloc[0]*(1-0.0003)
+        shares_cy=0.0; pos='MAIN'
+    peak=INIT; pbw=None; sc=2; ep=main_close.iloc[0]
+    hse=0; last_rb=None; stopped=False; navs=[]; events=[]
 
     for i in range(lookback):
         mp=main_close.iloc[i]; cp=cy_close.iloc[i]
@@ -260,7 +315,33 @@ def gen_chart(raw,df_main,dfs_g,both=False):
     ax3.tick_params(labelsize=8); ax3.grid(True,alpha=0.12)
 
     buf=io.BytesIO(); plt.savefig(buf,dpi=150,bbox_inches='tight',facecolor='#FAFAFA'); plt.close()
-    return buf.getvalue(), main_sig, main_px, rsi, bb_pos, sub_state, warn, pos
+    end_state={'pos':pos,'shares_main':float(shares_main),'shares_cy':float(shares_cy),
+               'cash':float(cash),'entry_main':float(ep) if pos=='MAIN' else float(main_close.iloc[-1]),
+               'entry_cy':float(hse) if pos=='CY' else float(cy_close.iloc[-1])}
+    # 转换events为交易dict
+    trade_list=[]
+    entry_main=None; entry_cy=None
+    for ei,etype in events:
+        if etype=='BUY_MAIN':
+            entry_main=(ei,main_close.iloc[ei])
+            trade_list.append({'date':main_sub['date'].iloc[ei].strftime('%Y-%m-%d'),'name':MAIN_NAME,
+                               'dir':'BUY','price':float(main_close.iloc[ei]),'pnl':0,'why':'信号买入'})
+        elif etype=='SELL_MAIN' and entry_main:
+            pnl=(main_close.iloc[ei]/entry_main[1]-1)*100
+            trade_list.append({'date':main_sub['date'].iloc[ei].strftime('%Y-%m-%d'),'name':MAIN_NAME,
+                               'dir':'SELL','price':float(main_close.iloc[ei]),'pnl':round(pnl,1),'why':'信号卖出'})
+            entry_main=None
+        elif etype=='BUY_CY':
+            entry_cy=(ei,cy_close.iloc[ei])
+            trade_list.append({'date':main_sub['date'].iloc[ei].strftime('%Y-%m-%d'),'name':'创业板',
+                               'dir':'BUY','price':float(cy_close.iloc[ei]),'pnl':0,'why':'MACD买入'})
+        elif etype in ('SELL_CY','STOP_CY') and entry_cy:
+            pnl=(cy_close.iloc[ei]/entry_cy[1]-1)*100
+            tag='止损' if etype=='STOP_CY' else '卖出'
+            trade_list.append({'date':main_sub['date'].iloc[ei].strftime('%Y-%m-%d'),'name':'创业板',
+                               'dir':'SELL','price':float(cy_close.iloc[ei]),'pnl':round(pnl,1),'why':tag})
+            entry_cy=None
+    return buf.getvalue(), main_sig, main_px, rsi, bb_pos, sub_state, warn, pos, end_state, trade_list
 
 def upload_chart(token,img_bytes):
     ts=pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
@@ -276,6 +357,21 @@ def upload_chart(token,img_bytes):
     body=json.dumps({'message':'YH05 chart','content':base64.b64encode(img_bytes).decode('ascii'),'branch':'main',**({'sha':sha}if sha else{})}).encode()
     ur.urlopen(ur.Request(api,data=body,headers={**h,'Content-Type':'application/json'},method='PUT'),timeout=15,context=ctx)
     return f'https://cdn.jsdelivr.net/gh/{REPO}@main/YH05/{fn}'
+
+def push_code(token):
+    self_path=os.path.abspath(__file__)
+    with open(self_path,'rb') as f: raw=f.read()
+    b64=base64.b64encode(raw).decode('ascii')
+    ctx=ssl._create_unverified_context()
+    h={'Authorization':'Bearer '+token,'User-Agent':'YH05'}
+    api=f'https://api.github.com/repos/{REPO}/contents/YH05/daily_signal.py'
+    try:
+        r=json.loads(ur.urlopen(ur.Request(api,headers=h),timeout=10,context=ctx).read())
+        sha=r.get('sha')
+    except: sha=None
+    body=json.dumps({'message':'YH05 daily update','content':b64,'branch':'main',**({'sha':sha}if sha else{})}).encode()
+    ur.urlopen(ur.Request(api,data=body,headers={**h,'Content-Type':'application/json'},method='PUT'),timeout=15,context=ctx)
+    print(f"  代码已推送 YH05/daily_signal.py ({'更新' if sha else '新建'})")
 
 def main():
     try:
@@ -301,7 +397,22 @@ def main():
             except Exception as e: print(f'  实时行情失败: {e}')
 
         print("生成图表...")
-        img_bytes,sig,px,rsi,bb_pos,sub_state,warn,pos=gen_chart(raw,df_main,dfs_g)
+        state=load_state()
+        if state: print(f"  加载持仓状态: {state['last_date'].strftime('%Y-%m-%d')} {state['pos']}")
+        img_bytes,sig,px,rsi,bb_pos,sub_state,warn,pos,end_state,trade_list=gen_chart(raw,df_main,dfs_g,state)
+
+        # 交易变动提醒
+        old_trades=state.get('trades',[]) if state else []
+        old_dates={t['date'] for t in old_trades}
+        new_trades=[t for t in trade_list if t['date'] not in old_dates]
+        today_str=pd.Timestamp.now().strftime('%Y-%m-%d')
+        new_trades=[t for t in new_trades if t['date']==today_str]
+
+        # 保存状态
+        latest_date=pd.Timestamp.now().floor('s')
+        save_state(latest_date,end_state['pos'],end_state['shares_main'],
+                   end_state['shares_cy'],end_state['cash'],
+                   end_state['entry_main'],end_state['entry_cy'],trade_list)
 
         token=os.environ.get('GH_TOKEN','')
         if not token:
@@ -309,12 +420,36 @@ def main():
                 try: token=open(p).read().strip(); break
                 except: pass
         chart_url=''
-        if token: chart_url=upload_chart(token,img_bytes)
+        if token:
+            chart_url=upload_chart(token,img_bytes)
+            push_state(token)
+            push_code(token)
+
+        # 构建交易提醒
+        alert_body=''
+        if new_trades:
+            parts=[]
+            for t in new_trades:
+                d=t['date'][-5:]  # MM-DD
+                if t['dir']=='BUY':
+                    parts.append(f"买{t['name']}")
+                    alert_body+=f"🔴 {d} 买入 {t['name']} @{t['price']:.3f} {t['why']}\n"
+                else:
+                    pnl_s=f"{t['pnl']:+.1f}%"
+                    parts.append(f"卖{t['name']}{pnl_s}")
+                    alert_body+=f"🟢 {d} 卖出 {t['name']} {pnl_s} ({t['why']})\n"
 
         body=(f'{sig}{warn}\n'
               f'{sub_state}\n'
               f'红利低波@{px:.3f} RSI{rsi:.1f} BB{bb_pos:.0f}%')
-        send_bark(f'YH05 {sig}{warn}',body,chart_url)
+        if alert_body:
+            body=alert_body+'\n'+body
+
+        if new_trades:
+            title=f'YH05 {" ".join(parts)}'
+        else:
+            title=f'YH05 {sig}{warn}'
+        send_bark(title,body,chart_url)
         with open('_preview.png','wb') as f: f.write(img_bytes)
         print(f"完成! 图表: _preview.png")
     except Exception as e:
