@@ -4,7 +4,7 @@
 标的: 山东高速 渝农商行 皖通高速 江苏银行
 调试版 — 从YH_ultra fork, +创业板(MACD强)补位
 """
-import sys, io, os, json, ssl, base64, warnings
+import sys, io, os, json, ssl, time, base64, warnings
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 import akshare as ak, pandas as pd, numpy as np
 import urllib.request as ur
@@ -111,14 +111,25 @@ def push_state(token):
         print(f'  状态推送失败: {e}')
 
 # =====================================================
+def _retry(fn, *args, retries=3, delay=5, **kwargs):
+    """网络重试: 失败后延迟递增, 最后一次仍失败才抛出"""
+    for i in range(retries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            if i == retries - 1:
+                raise
+            print(f'  网络重试 {i+1}/{retries} ({e.__class__.__name__})...')
+            time.sleep(delay * (i + 1))
+
 def fetch():
     dfs = {}
     for name, sym in ALL_STOCKS.items():
         if sym.startswith('sz159') or sym.startswith('sh510'):
-            df = ak.fund_etf_hist_sina(symbol=sym)
+            df = _retry(ak.fund_etf_hist_sina, symbol=sym)
             df = df.rename(columns={'prevclose':'pre_close'})
         else:
-            df = ak.stock_zh_a_daily(symbol=sym, adjust='qfq')
+            df = _retry(ak.stock_zh_a_daily, symbol=sym, adjust='qfq')
         df['date'] = pd.to_datetime(df['date'])
         dfs[name] = df[['date','open','high','low','close','volume']].sort_values('date').reset_index(drop=True)
     return dfs
