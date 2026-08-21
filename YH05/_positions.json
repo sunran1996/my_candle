@@ -1,11 +1,11 @@
 {
-  "last_date": "2026-08-20",
+  "last_date": "2026-08-21",
   "pos": "MAIN",
-  "shares_main": 5205906.68566773,
+  "shares_main": 6374329.432620041,
   "shares_cy": 0.0,
   "cash": 0.0,
   "entry_main": 1.16,
-  "entry_cy": 3.528,
+  "entry_cy": 3.553,
   "trades": [
     {
       "date": "2026-03-18",
