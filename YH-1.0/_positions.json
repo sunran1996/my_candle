@@ -1,5 +1,5 @@
 {
-  "last_date": "2026-08-19",
+  "last_date": "2026-08-20",
   "cash": 25380039.03684573,
   "total_injected": 6840000,
   "last_inject_month": 8,
@@ -31,7 +31,7 @@
     "江苏银行": {
       "shares": 1908148.5575644912,
       "entry": 10.56,
-      "high": 11.95,
+      "high": 12.1,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 0
