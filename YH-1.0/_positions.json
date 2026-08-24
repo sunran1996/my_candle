@@ -1,6 +1,6 @@
 {
-  "last_date": "2026-08-20",
-  "cash": 25380039.03684573,
+  "last_date": "2026-08-21",
+  "cash": 1951934.5056359097,
   "total_injected": 6840000,
   "last_inject_month": 8,
   "positions": {
@@ -21,9 +21,9 @@
       "loss_streak": 1
     },
     "皖通高速": {
-      "shares": 0,
-      "entry": 0,
-      "high": 0,
+      "shares": 1510886.018670796,
+      "entry": 15.5,
+      "high": 15.5,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 0
@@ -46,14 +46,6 @@
     }
   },
   "trades": [
-    {
-      "date": "2025-09-16",
-      "name": "山东高速",
-      "dir": "BUY",
-      "price": 8.51,
-      "pnl": 0,
-      "why": "RSI27 评3 加仓(连2亏,实25%)"
-    },
     {
       "date": "2025-09-17",
       "name": "皖通高速",
@@ -445,6 +437,14 @@
       "price": 10.81,
       "pnl": 0,
       "why": "RSI42 评2"
+    },
+    {
+      "date": "2026-08-21",
+      "name": "皖通高速",
+      "dir": "BUY",
+      "price": 15.5,
+      "pnl": 0,
+      "why": "RSI38 评1"
     }
   ]
 }
