@@ -1,14 +1,14 @@
 {
-  "last_date": "2026-08-26",
+  "last_date": "2026-08-27",
   "pos": "MAIN",
-  "shares_main": 10366221.022449676,
+  "shares_main": 12844901.797227815,
   "shares_cy": 0.0,
   "cash": 0.0,
   "entry_main": 1.16,
-  "entry_cy": 3.459,
+  "entry_cy": 3.494,
   "trades": [
     {
-      "date": "2026-03-18",
+      "date": "2026-03-19",
       "name": "创业板",
       "dir": "BUY",
       "price": 3.338,
@@ -19,8 +19,8 @@
       "date": "2026-05-18",
       "name": "创业板",
       "dir": "SELL",
-      "price": 3.923,
-      "pnl": 17.5,
+      "price": 3.97,
+      "pnl": 18.9,
       "why": "卖出"
     },
     {
