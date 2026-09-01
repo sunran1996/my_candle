@@ -228,6 +228,7 @@ def push_alerts(token):
     b64 = base64.b64encode(raw).decode('ascii')
     try:
         github_put(token, 'YH-1.0/_alerts_sent.json', b64, 'YH-1.0 alert dedup state')
+        print(f'  提醒状态已推送')
     except Exception as e:
         print(f'  提醒状态推送失败: {e}')
 
