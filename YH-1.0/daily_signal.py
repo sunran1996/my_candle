@@ -25,7 +25,7 @@ ETF_STOCKS = {'创业板': 'sz159915'}
 ALL_STOCKS = {**CORE_STOCKS, **ETF_STOCKS}
 
 INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
-BARK_ENABLED = False  # 关闭Bark推送
+BARK_ENABLED = True  # 启用Bark(仅推接近信号/买卖信号/交易, 不推纯持仓状态)
 BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH']  # 仅推送给第一个用户
 REPO = 'sunran1996/my_candle'
 
@@ -163,6 +163,43 @@ def check_buy(row, name):
     sc = (1 if rsi <= rsi_th else 0) + (1 if dist <= bb_th else 0)
     if rsi <= 30: sc += 1
     return sc >= 1, sc
+
+NEAR_PCT = 0.03  # 接近买卖点提示阈值(3%)
+
+def proximity_alert(row, name, holding, entry_px, high_px, accel_flag, cooldown_days):
+    """接近买/卖点提示, 返回 (短标签, 详情) 或 None"""
+    close = row['close']; rsi = row['rsi']
+    bp = BUY_PARAMS.get(name, {})
+    bb_up = row.get('bb_up'); bb_lo = row.get('bb_lo')
+
+    if not holding:
+        if cooldown_days > 0:
+            return None
+        if 'rsi' not in bp or 'bb' not in bp:
+            return None  # 创业板等MACD驱动, 无RSI/BB
+        if pd.isna(bb_lo) or pd.isna(bb_up) or bb_up <= bb_lo:
+            return None
+        buy_px = bb_lo + bp['bb'] * (bb_up - bb_lo)  # BB触发价
+        rsi_th = bp['rsi']
+        if buy_px > 0 and close <= buy_px * (1 + NEAR_PCT):
+            return (f'近买{name}', f'接近买点 {name} 现{close:.2f} 建议≤{buy_px:.2f} RSI{rsi:.0f}(阈{rsi_th})')
+        if pd.notna(rsi) and rsi <= rsi_th + 3:
+            return (f'近买{name}', f'RSI临近 {name} RSI{rsi:.0f}(阈{rsi_th}) 现{close:.2f}')
+        return None
+    else:
+        tp = bp.get('tp', 0.15); tp_hi = bp.get('tp_hi', 0.20)
+        if accel_flag:
+            floor = entry_px * (1 + tp)
+            stop_px = max(high_px * (1 - TRAIL_STOP), floor)
+            target_px = entry_px * (1 + tp_hi)
+        else:
+            stop_px = high_px * (1 - TRAIL_STOP)
+            target_px = entry_px * (1 + tp)
+        if stop_px > 0 and stop_px < close <= stop_px * (1 + NEAR_PCT):
+            return (f'近卖{name}', f'接近止损 {name} 现{close:.2f} 止损≈{stop_px:.2f} 成本{entry_px:.2f}')
+        if target_px > 0 and target_px * (1 - NEAR_PCT) <= close < target_px:
+            return (f'近卖{name}', f'接近止盈 {name} 现{close:.2f} 止盈≈{target_px:.2f} 成本{entry_px:.2f}')
+        return None
 
 # =====================================================
 def run_backtest(start_str=None):
@@ -916,6 +953,7 @@ def live_signal():
 
     lines = []
     buy_list = []
+    alerts = []
     for name in ALL_STOCKS:
         row = dfs[name].iloc[-1]
         close = row['close']; rsi = row['rsi']
@@ -925,6 +963,12 @@ def live_signal():
 
         buy_ok, sc = check_buy(row, name)
         holding = positions.get(name, 0) > 0
+
+        # 接近买卖点提示
+        pa = proximity_alert(row, name, holding, positions.get(name, 0),
+                             high.get(name, 0), accel.get(name, False), cooldown.get(name, 0))
+        if pa:
+            alerts.append(pa)
 
         if buy_ok and not holding:
             sig = '买入'
@@ -1086,11 +1130,14 @@ def live_signal():
     buy_count = len(buy_names)
     holding_count = sum(1 for p in positions.values() if p > 0)
 
+    # 接近买卖点提示
+    near_short = ' '.join(a[0] for a in alerts)
+    near_body = '\n'.join(f'  ⚠️ {a[1]}' for a in alerts)
+
     # 交易变动提醒
-    alert = ''
     alert_body = ''
+    parts = []
     if new_trades:
-        parts = []
         for t in new_trades:
             d = t['date'].strftime('%m-%d')
             if t['dir'] == 'BUY':
@@ -1106,18 +1153,24 @@ def live_signal():
                 else:
                     parts.append(f"卖{t['name']}{pnl_s}")
                     alert_body += f"🟢 {d} 卖出 {t['name']} {pnl_s} ({why_cn})\n"
-        alert = '⚠ ' + ' '.join(parts) + '\n'
+
+    # 是否推送: 有接近信号/买入信号/交易变动才推, 纯持仓/空仓状态不推
+    actionable = len(alerts) > 0 or buy_count > 0 or len(new_trades) > 0
 
     if not is_trading_day:
         day_type = '周末' if is_weekend else '假日'
-        if buy_count >= 1:
+        if alerts:
+            title = f'YH1.0 [{day_type}] ⚠️ {near_short}'
+        elif buy_count >= 1:
             title = f'YH1.0 [{day_type}] 买入: ' + ' '.join(buy_names)
         elif holding_count > 0:
             title = f'YH1.0 [{day_type}] 持仓中 ({holding_count}只)'
         else:
             title = f'YH1.0 [{day_type}] 空仓 (非交易日)'
     else:
-        if new_trades:
+        if alerts:
+            title = 'YH1.0 ⚠️ ' + near_short
+        elif new_trades:
             title = 'YH1.0 ' + ' '.join(parts)
         elif buy_count >= 3: title = 'YH1.0 多只买入! ' + ' '.join(buy_names)
         elif buy_count >= 1: title = 'YH1.0 买入: ' + ' '.join(buy_names)
@@ -1125,12 +1178,18 @@ def live_signal():
         else: title = 'YH1.0 空仓观望'
 
     body = '\n'.join(lines)
+    if near_body:
+        body = '⚠️ 接近买卖点:\n' + near_body + '\n' + body
     if alert_body:
         body = alert_body + '\n' + body
     if not is_trading_day:
         body = f'⚠️ 今日{day_type}, 以下为最近交易日信号:\n' + body
-    send_bark(title, body, chart_url)
-    print("已推送")
+
+    if actionable:
+        send_bark(title, body, chart_url)
+        print("已推送")
+    else:
+        print("无动作信号, 跳过推送")
 
     with open('_preview.png','wb') as f: f.write(img_bytes)
     print(f"完成! _preview.png")
