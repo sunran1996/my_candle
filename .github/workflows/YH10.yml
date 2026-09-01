@@ -2,7 +2,10 @@ name: YH-1.0 Stock Tracker
 
 on:
   schedule:
-    - cron: '30 2 * * 1-5'
+      - cron: '*/10 9-14 * * 1-5'
+        timezone: 'Asia/Shanghai'
+      - cron: '0 15 * * 1-5'
+        timezone: 'Asia/Shanghai'
   workflow_dispatch:
 
 permissions:
