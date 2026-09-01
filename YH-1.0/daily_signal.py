@@ -192,14 +192,32 @@ def proximity_alert(row, name, holding, entry_px, high_px, accel_flag, cooldown_
             floor = entry_px * (1 + tp)
             stop_px = max(high_px * (1 - TRAIL_STOP), floor)
             target_px = entry_px * (1 + tp_hi)
+            stop_label = '保底'
         else:
             stop_px = high_px * (1 - TRAIL_STOP)
             target_px = entry_px * (1 + tp)
+            stop_label = '移动止损'
         if stop_px > 0 and stop_px < close <= stop_px * (1 + NEAR_PCT):
-            return (f'近卖{name}', f'接近止损 {name} 现{close:.2f} 止损≈{stop_px:.2f} 成本{entry_px:.2f}')
+            return (f'近卖{name}', f'接近{stop_label} {name} 现{close:.2f} {stop_label}≈{stop_px:.2f} 成本{entry_px:.2f}')
         if target_px > 0 and target_px * (1 - NEAR_PCT) <= close < target_px:
             return (f'近卖{name}', f'接近止盈 {name} 现{close:.2f} 止盈≈{target_px:.2f} 成本{entry_px:.2f}')
         return None
+
+ALERT_FILE = os.path.join(SCRIPT, '_alerts_sent.json')
+ALERT_COOLDOWN_MIN = 60  # 同一标的提醒冷却(分钟), 避免盘中每10分钟重复推送
+
+def _load_sent_alerts():
+    if not os.path.exists(ALERT_FILE): return {}
+    try:
+        with open(ALERT_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except: return {}
+
+def _save_sent_alerts(d):
+    try:
+        with open(ALERT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(d, f, ensure_ascii=False)
+    except: pass
 
 # =====================================================
 def run_backtest(start_str=None):
@@ -968,7 +986,7 @@ def live_signal():
         pa = proximity_alert(row, name, holding, positions.get(name, 0),
                              high.get(name, 0), accel.get(name, False), cooldown.get(name, 0))
         if pa:
-            alerts.append(pa)
+            alerts.append((name, pa[0], pa[1]))
 
         if buy_ok and not holding:
             sig = '买入'
@@ -989,12 +1007,30 @@ def live_signal():
             extra += f' 连亏{loss_streak[name]}'
         lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%{extra}')
 
+    # 去重: 同标的在冷却时间内只提醒一次, 避免盘中每10分钟重复推送
+    sent_map = _load_sent_alerts()
+    now_ts = pd.Timestamp.now()
+    fresh = []
+    for nm, short, detail in alerts:
+        last = sent_map.get(nm)
+        if last:
+            try:
+                if (now_ts - pd.Timestamp(last)).total_seconds() < ALERT_COOLDOWN_MIN * 60:
+                    continue
+            except Exception:
+                pass
+        fresh.append((nm, short, detail))
+        sent_map[nm] = now_ts.strftime('%Y-%m-%d %H:%M:%S')
+    if fresh:
+        _save_sent_alerts(sent_map)
+    alerts = fresh
+
     print(f"\n{'='*50}")
     print(f"  {' '.join(lines)}")
     print(f"{'='*50}")
     if alerts:
         print("  ⚠️ 接近买卖点:")
-        for _s, _d in alerts:
+        for _n, _s, _d in alerts:
             print(f"    {_d}")
 
     # 简版K线图 + 买卖点 + 统计面板
@@ -1135,8 +1171,8 @@ def live_signal():
     holding_count = sum(1 for p in positions.values() if p > 0)
 
     # 接近买卖点提示
-    near_short = ' '.join(a[0] for a in alerts)
-    near_body = '\n'.join(f'  ⚠️ {a[1]}' for a in alerts)
+    near_short = ' '.join(a[1] for a in alerts)
+    near_body = '\n'.join(f'  ⚠️ {a[2]}' for a in alerts)
 
     # 交易变动提醒
     alert_body = ''
