@@ -992,6 +992,10 @@ def live_signal():
     print(f"\n{'='*50}")
     print(f"  {' '.join(lines)}")
     print(f"{'='*50}")
+    if alerts:
+        print("  ⚠️ 接近买卖点:")
+        for _s, _d in alerts:
+            print(f"    {_d}")
 
     # 简版K线图 + 买卖点 + 统计面板
     fig, axes = plt.subplots(len(ALL_STOCKS)+1, 1, figsize=(9, 2.9*(len(ALL_STOCKS)+1)), facecolor='white',
