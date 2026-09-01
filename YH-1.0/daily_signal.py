@@ -219,6 +219,18 @@ def _save_sent_alerts(d):
             json.dump(d, f, ensure_ascii=False)
     except: pass
 
+def push_alerts(token):
+    """推送提醒去重状态到GitHub, 使冷却跨run生效"""
+    if not os.path.exists(ALERT_FILE):
+        return
+    with open(ALERT_FILE, 'rb') as f:
+        raw = f.read()
+    b64 = base64.b64encode(raw).decode('ascii')
+    try:
+        github_put(token, 'YH-1.0/_alerts_sent.json', b64, 'YH-1.0 alert dedup state')
+    except Exception as e:
+        print(f'  提醒状态推送失败: {e}')
+
 # =====================================================
 def run_backtest(start_str=None):
     start = pd.Timestamp(start_str) if start_str else None
@@ -1159,6 +1171,7 @@ def live_signal():
         chart_url = upload_chart(token, img_bytes)
         push_code(token)
         push_state(token)
+        push_alerts(token)
 
     # 推送
     # 非交易日检测: 周末=非交易日, 工作日=交易日(不推断假日)
