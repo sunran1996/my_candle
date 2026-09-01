@@ -164,7 +164,8 @@ def check_buy(row, name):
     if rsi <= 30: sc += 1
     return sc >= 1, sc
 
-NEAR_PCT = 0.03  # 接近买卖点提示阈值(3%)
+NEAR_PCT      = 0.03   # 接近买点提示阈值(3%)
+NEAR_SELL_PCT = 0.015  # 接近卖点提示阈值(1.5%), 卖点更精确避免过早提醒
 
 def proximity_alert(row, name, holding, entry_px, high_px, accel_flag, cooldown_days):
     """接近买/卖点提示, 返回 (短标签, 详情) 或 None"""
@@ -192,14 +193,14 @@ def proximity_alert(row, name, holding, entry_px, high_px, accel_flag, cooldown_
             floor = entry_px * (1 + tp)
             stop_px = max(high_px * (1 - TRAIL_STOP), floor)
             target_px = entry_px * (1 + tp_hi)
-            stop_label = '保底'
+            stop_label = '锁盈'
         else:
             stop_px = high_px * (1 - TRAIL_STOP)
             target_px = entry_px * (1 + tp)
             stop_label = '移动止损'
-        if stop_px > 0 and stop_px < close <= stop_px * (1 + NEAR_PCT):
+        if stop_px > 0 and stop_px < close <= stop_px * (1 + NEAR_SELL_PCT):
             return (f'近卖{name}', f'接近{stop_label} {name} 现{close:.2f} {stop_label}≈{stop_px:.2f} 成本{entry_px:.2f}')
-        if target_px > 0 and target_px * (1 - NEAR_PCT) <= close < target_px:
+        if target_px > 0 and target_px * (1 - NEAR_SELL_PCT) <= close < target_px:
             return (f'近卖{name}', f'接近止盈 {name} 现{close:.2f} 止盈≈{target_px:.2f} 成本{entry_px:.2f}')
         return None
 
@@ -289,13 +290,13 @@ def run_backtest(start_str=None):
                     if cp <= stop_px:
                         do = True
                         sell_px = max(cp, floor_px)
-                        why = f'BB加速止盈{(sell_px/entry[n]-1)*100:+.1f}%(保底{tp*100:.0f}%)'
+                        why = f'BB加速止盈{(sell_px/entry[n]-1)*100:+.1f}%(锁盈{tp*100:.0f}%)'
             elif dd <= -TRAIL_STOP:
                 do = True; why = f'移动止损{pnl*100:+.1f}%'
             elif pnl >= tp:
                 d2 = r.iloc[0].get('bb_up_d2')
                 if not pd.isna(d2) and d2 > 0:
-                    accel[n] = True  # 加速→目标tp_hi+保底tp
+                    accel[n] = True  # 加速→目标tp_hi+锁盈tp
                 else:
                     do = True; why = f'止盈{pnl*100:+.1f}%'
 
@@ -1200,7 +1201,7 @@ def live_signal():
             else:
                 pnl_s = f"{t['pnl']:+.1f}%"
                 why_cn = {'hard':'硬止损','trail':'移动止损','tp20':'止盈','accel_tp25':'BB加速止盈',
-                          'accel_floor':'BB加速保底'}.get(t['why'], t['why'])
+                          'accel_floor':'BB加速锁盈'}.get(t['why'], t['why'])
                 if '换仓' in t['why']:
                     parts.append(f"换仓{t['name']}")
                     alert_body += f"🔄 {d} {t['why']} {pnl_s}\n"
