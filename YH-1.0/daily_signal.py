@@ -25,6 +25,7 @@ ETF_STOCKS = {'创业板': 'sz159915'}
 ALL_STOCKS = {**CORE_STOCKS, **ETF_STOCKS}
 
 INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
+BARK_ENABLED = False  # 关闭Bark推送
 BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH']  # 仅推送给第一个用户
 REPO = 'sunran1996/my_candle'
 
@@ -565,6 +566,8 @@ def fetch_realtime(all_stocks_dict):
 
 
 def send_bark(title, body, url=''):
+    if not BARK_ENABLED:
+        return
     data = json.dumps({'title':title,'body':body,'url':url}).encode()
     for bk in BARK_KEYS:
         try:
