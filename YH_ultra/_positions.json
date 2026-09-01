@@ -1,8 +1,8 @@
 {
-  "last_date": "2026-08-31",
-  "cash": 356824.65396150714,
-  "total_injected": 2640000,
-  "last_inject_month": 8,
+  "last_date": "2026-09-01",
+  "cash": 376824.65396150714,
+  "total_injected": 2660000,
+  "last_inject_month": 9,
   "positions": {
     "山东高速": {
       "shares": 262082.10636619118,
@@ -23,7 +23,7 @@
     "皖通高速": {
       "shares": 184570.59224906433,
       "entry": 15.5,
-      "high": 16.69,
+      "high": 16.91,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 0
@@ -31,7 +31,7 @@
     "江苏银行": {
       "shares": 223916.5513147221,
       "entry": 10.56,
-      "high": 12.16,
+      "high": 12.29,
       "accel": true,
       "cooldown": 0,
       "loss_streak": 0
