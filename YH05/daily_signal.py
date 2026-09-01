@@ -126,11 +126,14 @@ def gen_chart(raw,df_main,dfs_g,state=None):
     macd_v=g_row['macd_h']; macd_line=g_row['macd_line']
     cy_px=raw['创业板']['close'].iloc[-1]; cy_mom=g_row['mom']
 
-    # 预警
+    # 预警(带建议价格)
     warn=''
     if main_sig=='持有':
-        if bb_pos<20 or rsi<35: warn=' ⚠ 接近买入'
-        elif bb_pos>80 or rsi>70: warn=' ⚠ 接近卖出'
+        if adj > 0 and up > lo:
+            buy_px = lo * main_px / adj    # BB下轨对应实际价
+            sell_px = up * main_px / adj   # BB上轨对应实际价
+            if bb_pos<20 or rsi<35: warn=f' ⚠ 接近买入(建议≤{buy_px:.3f})'
+            elif bb_pos>80 or rsi>70: warn=f' ⚠ 接近卖出(建议≥{sell_px:.3f})'
 
     # 副线状态 — 在回测之后根据实际持仓pos生成
 
