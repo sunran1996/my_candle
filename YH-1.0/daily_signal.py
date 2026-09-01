@@ -198,7 +198,9 @@ def proximity_alert(row, name, holding, entry_px, high_px, accel_flag, cooldown_
             stop_px = high_px * (1 - TRAIL_STOP)
             target_px = entry_px * (1 + tp)
             stop_label = '移动止损'
-        if stop_px > 0 and stop_px < close <= stop_px * (1 + NEAR_SELL_PCT):
+        # 止损/锁盈本质是"从高点回落"才触发, 现价须低于最高价才预警, 否则创新高时误报
+        pulled_back = high_px > 0 and close < high_px
+        if pulled_back and stop_px > 0 and stop_px < close <= stop_px * (1 + NEAR_SELL_PCT):
             return (f'近卖{name}', f'接近{stop_label} {name} 现{close:.2f} {stop_label}≈{stop_px:.2f} 成本{entry_px:.2f}')
         if target_px > 0 and target_px * (1 - NEAR_SELL_PCT) <= close < target_px:
             return (f'近卖{name}', f'接近止盈 {name} 现{close:.2f} 止盈≈{target_px:.2f} 成本{entry_px:.2f}')
