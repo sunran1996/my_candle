@@ -1,19 +1,21 @@
 {
   "last_date": "2026-09-02",
-  "cash": 23648947.24,
-  "total_injected": 6860000,
+  "cash": 3077973.818901506,
+  "total_injected": 2600000,
   "last_inject_month": 9,
+  "fix_pending": null,
+  "intraday_accel": [],
   "positions": {
     "山东高速": {
-      "shares": 0.0,
-      "entry": 0.0,
-      "high": 0.0,
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 2
     },
     "渝农商行": {
-      "shares": 3362431.719464168,
+      "shares": 431526.848632448,
       "entry": 6.11,
       "high": 7.04,
       "accel": false,
@@ -21,7 +23,7 @@
       "loss_streak": 1
     },
     "皖通高速": {
-      "shares": 1510886.018670796,
+      "shares": 194459.4216594126,
       "entry": 15.5,
       "high": 16.91,
       "accel": false,
@@ -29,7 +31,7 @@
       "loss_streak": 0
     },
     "江苏银行": {
-      "shares": 1908148.5575644912,
+      "shares": 244887.451246021,
       "entry": 10.56,
       "high": 12.29,
       "accel": true,
@@ -46,6 +48,14 @@
     }
   },
   "trades": [
+    {
+      "date": "2025-09-18",
+      "name": "皖通高速",
+      "dir": "BUY",
+      "price": 12.53,
+      "pnl": 0,
+      "why": "RSI10 评3 加仓(连3亏,实24%)"
+    },
     {
       "date": "2025-09-22",
       "name": "江苏银行",
@@ -132,7 +142,7 @@
       "dir": "SELL",
       "price": 3.346,
       "pnl": 3.7197768133911957,
-      "why": "换仓→江苏银行(卖98%)"
+      "why": "换仓→江苏银行(卖97%)"
     },
     {
       "date": "2026-01-16",
@@ -164,7 +174,7 @@
       "dir": "BUY",
       "price": 5.89,
       "pnl": 0,
-      "why": "RSI40 评1 加仓(连2亏,实24%)"
+      "why": "RSI40 评1 加仓(连2亏,实25%)"
     },
     {
       "date": "2026-01-23",
