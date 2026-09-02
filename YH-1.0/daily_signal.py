@@ -66,13 +66,16 @@ def load_state():
         return None
 
 def save_state(last_date, cash, total_injected, last_inject_month,
-               shares, entry, high, accel, cooldown, loss_streak, all_trades):
+               shares, entry, high, accel, cooldown, loss_streak, all_trades,
+               fix_pending=None, intraday_accel=None):
     """保存持仓状态到本地JSON"""
     out = {
         'last_date': last_date.strftime('%Y-%m-%d'),
         'cash': cash,
         'total_injected': total_injected,
         'last_inject_month': last_inject_month,
+        'fix_pending': fix_pending,
+        'intraday_accel': intraday_accel if intraday_accel else [],
         'positions': {},
         'trades': [],
     }
@@ -856,9 +859,35 @@ def live_signal():
         all_trades = []
         dates = sorted(set.union(*[set(d['date']) for d in dfs.values()]))
 
+    # ── 盘中成交后参数校准: 用真实日线修正 high/accel(成交价保留) ──
+    fix_pending_prev = state.get('fix_pending') if state else None
+    if fix_pending_prev:
+        fix_ts = pd.Timestamp(fix_pending_prev).normalize()
+        if fix_ts < today:  # 前一日真实日线已可用, 校准
+            intraday_accel_prev = set(state.get('intraday_accel') or [])
+            for n in ALL_STOCKS:
+                if shares[n] <= 0: continue
+                r = raw[n][raw[n]['date'].dt.normalize() == fix_ts]
+                if len(r) == 0: continue
+                row = r.iloc[0]
+                # 修正 high: 盘中用的是实时价, 换真实最高价
+                if row['high'] > high[n]:
+                    high[n] = row['high']
+                # 修正 accel: 盘中误切(真实收盘价不满足加速条件)则退回
+                if n in intraday_accel_prev and accel[n]:
+                    rd = dfs[n][dfs[n]['date'].dt.normalize() == fix_ts]
+                    if len(rd) > 0:
+                        real_close = rd.iloc[0]['close']
+                        pnl = real_close / entry[n] - 1
+                        tp = BUY_PARAMS[n]['tp']
+                        d2 = rd.iloc[0].get('bb_up_d2')
+                        if not (pnl >= tp and (not pd.isna(d2)) and d2 > 0):
+                            accel[n] = False
+
     # ── 推进到最新 ──
     prev_trade_count = len(all_trades)
     snap_today = None
+    intraday_accel_new = set()   # 盘中今天新切accel的股票(次日用真实日线校准)
     for date in dates:
         # 盘中实时价驱动: 处理"今天"前拍快照, 若今天无成交则回滚副作用(避免cooldown/accel/high被重复应用)
         if date == today:
@@ -891,7 +920,9 @@ def live_signal():
             elif dd <= -TRAIL_STOP: do = True; why = 'trail'
             elif pnl >= tp:
                 d2 = r.iloc[0].get('bb_up_d2')
-                if not pd.isna(d2) and d2 > 0: accel[n] = True
+                if not pd.isna(d2) and d2 > 0:
+                    accel[n] = True
+                    if date == today: intraday_accel_new.add(n)
                 else: do = True; why = 'tp20'
             if do:
                 pnl_real = sell_px/entry[n] - 1
@@ -978,17 +1009,25 @@ def live_signal():
                                 all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'MACD{tag}(s{strength:.1f})'})
 
     # ── 保存状态 (持久化) ──
-    # 盘中实时价驱动: 触发信号则"真实成交"(成交价=实时价, 下面today_trades用于推通知);
-    # 成交后去掉"今天=实时价"这根K线, 状态回滚到真实日线最新日;
-    # 第二天workflow拉真实前一日close + 当天实时价, 重新计算冷却/加速/最高价等
+    # 盘中实时价驱动: 触发信号则"真实成交"(成交价=实时价, 推通知);
+    # 有成交→推进到今天固化(当天不再重复决策), 记录fix_pending(次日用真实日线修正high/accel);
+    # 无成交→回滚今天副作用, 停在真实日线(下午用新实时价重判)
     today_trades = [t for t in all_trades[prev_trade_count:] if t['date'].normalize() == today]
-    if snap_today is not None:
-        cash, shares, entry, high, accel, cooldown, loss_streak, last_inject_month, tc = snap_today
-        all_trades = all_trades[:tc]
-    hist = [d for d in dates if d < today]
-    latest_date = max(hist) if hist else (state['last_date'] if state else raw['山东高速']['date'].iloc[-1])
+    if today_trades:
+        latest_date = today
+        fix_pending = today.strftime('%Y-%m-%d')
+        intraday_accel = sorted(intraday_accel_new)
+    else:
+        fix_pending = None
+        intraday_accel = []
+        if snap_today is not None:
+            cash, shares, entry, high, accel, cooldown, loss_streak, last_inject_month, tc = snap_today
+            all_trades = all_trades[:tc]
+        hist = [d for d in dates if d < today]
+        latest_date = max(hist) if hist else (state['last_date'] if state else raw['山东高速']['date'].iloc[-1])
     save_state(latest_date, cash, total_injected, last_inject_month,
-               shares, entry, high, accel, cooldown, loss_streak, all_trades)
+               shares, entry, high, accel, cooldown, loss_streak, all_trades,
+               fix_pending, intraday_accel)
 
     positions = {n: entry[n] for n in ALL_STOCKS}
     holdings = {n: shares[n] for n in ALL_STOCKS}
