@@ -1,16 +1,16 @@
 {
-  "last_date": "2026-09-01",
-  "cash": 1971934.5056359097,
+  "last_date": "2026-09-02",
+  "cash": 23648947.237873707,
   "total_injected": 6860000,
   "last_inject_month": 9,
   "positions": {
     "山东高速": {
-      "shares": 2144973.9868487255,
-      "entry": 10.81,
-      "high": 11.01,
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
       "accel": false,
       "cooldown": 0,
-      "loss_streak": 1
+      "loss_streak": 2
     },
     "渝农商行": {
       "shares": 3362431.719464168,
@@ -46,14 +46,6 @@
     }
   },
   "trades": [
-    {
-      "date": "2025-09-17",
-      "name": "皖通高速",
-      "dir": "SELL",
-      "price": 12.72,
-      "pnl": -7.017543859649111,
-      "why": "trail"
-    },
     {
       "date": "2025-09-18",
       "name": "皖通高速",
@@ -445,6 +437,14 @@
       "price": 15.5,
       "pnl": 0,
       "why": "RSI38 评1"
+    },
+    {
+      "date": "2026-09-02",
+      "name": "山东高速",
+      "dir": "SELL",
+      "price": 10.11,
+      "pnl": -6.475485661424618,
+      "why": "trail"
     }
   ]
 }
