@@ -811,10 +811,14 @@ def live_signal():
 
     # ── 盘中实时价注入: 构造"今天"这根K线, 让回测自然处理今天 ──
     rt_prices = fetch_realtime(ALL_STOCKS)
-    today = pd.Timestamp.now().normalize()
-    is_trading_day = today.dayofweek < 5  # 周末不注入(与推送逻辑一致)
+    now_rt = pd.Timestamp.now()
+    today = now_rt.normalize()
+    hhmm = now_rt.hour * 100 + now_rt.minute
+    # 仅盘中交易时段注入: 09:30-11:30 / 13:00-15:00(工作日).
+    # 盘前/盘后 fetch_realtime 返回前收盘价, 注入会制造虚假"今天"信号.
+    in_session = today.dayofweek < 5 and (930 <= hhmm <= 1130 or 1300 <= hhmm <= 1500)
     injected = 0
-    if is_trading_day:
+    if in_session:
         for name in ALL_STOCKS:
             rt = rt_prices.get(name, 0)
             if rt <= 0:
@@ -1010,13 +1014,20 @@ def live_signal():
 
     # ── 保存状态 (持久化) ──
     # 盘中实时价驱动: 触发信号则"真实成交"(成交价=实时价, 推通知);
-    # 有成交→推进到今天固化(当天不再重复决策), 记录fix_pending(次日用真实日线修正high/accel);
+    # 有成交→推进到今天固化, 记录fix_pending(次日用真实日线修正high/accel);
+    # 今日已固化(早盘已成交)→保留固化不重复决策也不回滚;
     # 无成交→回滚今天副作用, 停在真实日线(下午用新实时价重判)
+    today_str = today.strftime('%Y-%m-%d')
     today_trades = [t for t in all_trades[prev_trade_count:] if t['date'].normalize() == today]
+    already_fixed_today = (state is not None) and (state.get('fix_pending') == today_str)
     if today_trades:
         latest_date = today
-        fix_pending = today.strftime('%Y-%m-%d')
+        fix_pending = today_str
         intraday_accel = sorted(intraday_accel_new)
+    elif already_fixed_today:
+        latest_date = today
+        fix_pending = today_str
+        intraday_accel = state.get('intraday_accel') or []
     else:
         fix_pending = None
         intraday_accel = []
