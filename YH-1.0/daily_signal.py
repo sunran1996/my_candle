@@ -978,18 +978,15 @@ def live_signal():
                                 all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'MACD{tag}(s{strength:.1f})'})
 
     # ── 保存状态 (持久化) ──
-    # 盘中实时价驱动: 今天有成交则推进到今天(当天不再重复决策), 否则停在真实日线最新日(下午重新判)
-    new_trades_all = all_trades[prev_trade_count:]   # 本次 run 新增的交易(未过滤)
-    traded_today = any(t['date'].normalize() == today for t in new_trades_all)
-    if traded_today:
-        latest_date = today
-    else:
-        # 今天无成交: 回滚"今天"这一天的副作用(cooldown/accel/high/定投等), 下午用新实时价重判
-        if snap_today is not None:
-            cash, shares, entry, high, accel, cooldown, loss_streak, last_inject_month, tc = snap_today
-            all_trades = all_trades[:tc]
-        hist = [d for d in dates if d < today]
-        latest_date = max(hist) if hist else (state['last_date'] if state else raw['山东高速']['date'].iloc[-1])
+    # 盘中实时价驱动: 触发信号则"真实成交"(成交价=实时价, 下面today_trades用于推通知);
+    # 成交后去掉"今天=实时价"这根K线, 状态回滚到真实日线最新日;
+    # 第二天workflow拉真实前一日close + 当天实时价, 重新计算冷却/加速/最高价等
+    today_trades = [t for t in all_trades[prev_trade_count:] if t['date'].normalize() == today]
+    if snap_today is not None:
+        cash, shares, entry, high, accel, cooldown, loss_streak, last_inject_month, tc = snap_today
+        all_trades = all_trades[:tc]
+    hist = [d for d in dates if d < today]
+    latest_date = max(hist) if hist else (state['last_date'] if state else raw['山东高速']['date'].iloc[-1])
     save_state(latest_date, cash, total_injected, last_inject_month,
                shares, entry, high, accel, cooldown, loss_streak, all_trades)
 
@@ -997,9 +994,7 @@ def live_signal():
     holdings = {n: shares[n] for n in ALL_STOCKS}
     cash_end = cash
     recent_trades = [t for t in all_trades if (pd.Timestamp.now()-t['date']).days < 365][-20:]
-    new_trades = all_trades[prev_trade_count:]
-    today_str = pd.Timestamp.now().strftime('%Y-%m-%d')
-    new_trades = [t for t in new_trades if t['date'] == today_str]
+    new_trades = today_trades   # 盘中今天触发的真实成交(状态已回滚, 但成交事件仍推通知)
 
     held = [(n, (dfs[n]['close'].iloc[-1]/pos-1)*100) for n, pos in positions.items() if pos > 0]
     if held:
@@ -1013,6 +1008,7 @@ def live_signal():
     lines = []
     buy_list = []
     alerts = []
+    traded_buy = {t['name'] for t in today_trades if t['dir'] == 'BUY'}
     for name in ALL_STOCKS:
         row = dfs[name].iloc[-1]
         close = row['close']; rsi = row['rsi']
@@ -1029,9 +1025,11 @@ def live_signal():
         if pa:
             alerts.append((name, pa[0], pa[1]))
 
-        if buy_ok and not holding:
+        if buy_ok and not holding and name not in traded_buy:
             sig = '买入'
             buy_list.append((name, sc))
+        elif name in traded_buy:
+            sig = '买入'   # 今天已成交(实时价)
         elif holding:
             sig = '持仓'
         else:
