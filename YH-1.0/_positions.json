@@ -1,13 +1,13 @@
 {
-  "last_date": "2026-09-02",
-  "cash": 23648947.237873707,
+  "last_date": "2026-09-03",
+  "cash": 0.0,
   "total_injected": 6860000,
   "last_inject_month": 9,
   "positions": {
     "山东高速": {
-      "shares": 0,
-      "entry": 0,
-      "high": 0,
+      "shares": 2338228.255091846,
+      "entry": 10.11,
+      "high": 10.11,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 2
@@ -46,14 +46,6 @@
     }
   },
   "trades": [
-    {
-      "date": "2025-09-18",
-      "name": "皖通高速",
-      "dir": "BUY",
-      "price": 12.53,
-      "pnl": 0,
-      "why": "RSI10 评3 加仓(连3亏,实24%)"
-    },
     {
       "date": "2025-09-22",
       "name": "江苏银行",
@@ -445,6 +437,14 @@
       "price": 10.11,
       "pnl": -6.475485661424618,
       "why": "trail"
+    },
+    {
+      "date": "2026-09-03",
+      "name": "山东高速",
+      "dir": "BUY",
+      "price": 10.11,
+      "pnl": 0,
+      "why": "RSI36 评2 加仓(连2亏,实25%)"
     }
   ]
 }
