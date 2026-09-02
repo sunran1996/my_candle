@@ -804,7 +804,28 @@ def _quick_positions(raw, dfs):
 
 def live_signal():
     print("获取数据...")
-    raw = fetch(); dfs = {n: add_indicators(d) for n, d in raw.items()}
+    raw = fetch()
+
+    # ── 盘中实时价注入: 构造"今天"这根K线, 让回测自然处理今天 ──
+    rt_prices = fetch_realtime(ALL_STOCKS)
+    today = pd.Timestamp.now().normalize()
+    is_trading_day = today.dayofweek < 5  # 周末不注入(与推送逻辑一致)
+    injected = 0
+    if is_trading_day:
+        for name in ALL_STOCKS:
+            rt = rt_prices.get(name, 0)
+            if rt <= 0:
+                continue
+            if any(d.normalize() == today for d in raw[name]['date']):
+                continue  # 今天日线已存在(收盘后运行), 不重复注入
+            new_row = pd.DataFrame([{
+                'date': today, 'open': rt, 'high': rt, 'low': rt,
+                'close': rt, 'volume': 0,
+            }])
+            raw[name] = pd.concat([raw[name], new_row], ignore_index=True)
+            injected += 1
+    dfs = {n: add_indicators(d) for n, d in raw.items()}
+    print(f"  盘中实时价注入 {injected}/{len(ALL_STOCKS)}只 (今天={today.strftime('%m-%d')})")
 
     # ── 增量回测: 从上次状态推进, 避免全量重放 ──
     state = load_state()
@@ -837,7 +858,12 @@ def live_signal():
 
     # ── 推进到最新 ──
     prev_trade_count = len(all_trades)
+    snap_today = None
     for date in dates:
+        # 盘中实时价驱动: 处理"今天"前拍快照, 若今天无成交则回滚副作用(避免cooldown/accel/high被重复应用)
+        if date == today:
+            snap_today = (cash, dict(shares), dict(entry), dict(high), dict(accel),
+                          dict(cooldown), dict(loss_streak), last_inject_month, len(all_trades))
         # 每月定投
         if last_inject_month is not None and date.month != last_inject_month:
             cash += MONTHLY_INJECT; total_injected += MONTHLY_INJECT
@@ -952,7 +978,18 @@ def live_signal():
                                 all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':f'MACD{tag}(s{strength:.1f})'})
 
     # ── 保存状态 (持久化) ──
-    latest_date = max(dates) if dates else (state['last_date'] if state else raw['山东高速']['date'].iloc[-1])
+    # 盘中实时价驱动: 今天有成交则推进到今天(当天不再重复决策), 否则停在真实日线最新日(下午重新判)
+    new_trades_all = all_trades[prev_trade_count:]   # 本次 run 新增的交易(未过滤)
+    traded_today = any(t['date'].normalize() == today for t in new_trades_all)
+    if traded_today:
+        latest_date = today
+    else:
+        # 今天无成交: 回滚"今天"这一天的副作用(cooldown/accel/high/定投等), 下午用新实时价重判
+        if snap_today is not None:
+            cash, shares, entry, high, accel, cooldown, loss_streak, last_inject_month, tc = snap_today
+            all_trades = all_trades[:tc]
+        hist = [d for d in dates if d < today]
+        latest_date = max(hist) if hist else (state['last_date'] if state else raw['山东高速']['date'].iloc[-1])
     save_state(latest_date, cash, total_injected, last_inject_month,
                shares, entry, high, accel, cooldown, loss_streak, all_trades)
 
@@ -971,19 +1008,7 @@ def live_signal():
     else:
         print(f"  当前持仓: 全部空仓")
 
-    # 实时行情: Sina直连 → akshare → 日线收盘价
-    rt_prices = fetch_realtime(ALL_STOCKS)
-    updated = 0
-    for name, rt in rt_prices.items():
-        if name in raw and rt > 0:
-            raw[name].loc[raw[name].index[-1], 'close'] = rt
-            raw[name].loc[raw[name].index[-1], 'date'] = pd.Timestamp.now().floor('s')
-            updated += 1
-    if updated > 0:
-        dfs = {n: add_indicators(d) for n, d in raw.items()}
-        print(f"  实时行情已更新 ({updated}/{len(ALL_STOCKS)}只)")
-    else:
-        print("  实时行情失败,用日线收盘价")
+    # 实时价已在回测前注入"今天"K线, dfs 已含实时价; 此处不再二次覆盖
 
     lines = []
     buy_list = []
@@ -1225,10 +1250,13 @@ def live_signal():
         else:
             title = f'YH1.0 [{day_type}] 空仓 (非交易日)'
     else:
-        if alerts:
-            title = 'YH1.0 ⚠️ ' + near_short
+        has_sell = any(t['dir'] == 'SELL' for t in new_trades)
+        if has_sell:
+            title = 'YH1.0 🔴 ' + ' '.join(parts)
         elif new_trades:
             title = 'YH1.0 ' + ' '.join(parts)
+        elif alerts:
+            title = 'YH1.0 ⚠️ ' + near_short
         elif buy_count >= 3: title = 'YH1.0 多只买入! ' + ' '.join(buy_names)
         elif buy_count >= 1: title = 'YH1.0 买入: ' + ' '.join(buy_names)
         elif holding_count > 0: title = f'YH1.0 持仓中 ({holding_count}只)'
