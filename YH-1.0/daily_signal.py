@@ -46,6 +46,7 @@ MAX_POS_BOOST  = 0.35       # 连亏≥2 + 有其他持仓 → 加仓35%
 MAX_POS_DOUBLE = 0.50       # 连亏≥4 + 有其他持仓 → 翻倍50%
 LOSS_STREAK_N  = 2          # 连续止损N次触发加仓
 MONTHLY_INJECT = 20000      # 每月定投2w
+BACKTEST_START = '2020-01-01'   # 全量回测起点(重建state时生效)
 
 SCRIPT = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(SCRIPT, '_positions.json')
@@ -862,6 +863,7 @@ def live_signal():
         cooldown = {n: 0 for n in ALL_STOCKS}; loss_streak = {n: 0 for n in ALL_STOCKS}
         all_trades = []
         dates = sorted(set.union(*[set(d['date']) for d in dfs.values()]))
+        dates = [d for d in dates if d >= pd.Timestamp(BACKTEST_START)]
 
     # ── 盘中成交后参数校准: 用真实日线修正 high/accel(成交价保留) ──
     fix_pending_prev = state.get('fix_pending') if state else None
