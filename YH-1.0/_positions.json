@@ -3,13 +3,13 @@
   "cash": 0.0,
   "total_injected": 2600000,
   "last_inject_month": 9,
-  "fix_pending": "2026-09-03",
+  "fix_pending": null,
   "intraday_accel": [],
   "positions": {
     "山东高速": {
       "shares": 300170.0126218483,
       "entry": 10.25,
-      "high": 10.25,
+      "high": 10.28,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 2
@@ -17,7 +17,7 @@
     "渝农商行": {
       "shares": 431526.848632448,
       "entry": 6.11,
-      "high": 7.04,
+      "high": 7.08,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 1
@@ -25,7 +25,7 @@
     "皖通高速": {
       "shares": 194459.4216594126,
       "entry": 15.5,
-      "high": 16.91,
+      "high": 17.03,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 0
@@ -33,7 +33,7 @@
     "江苏银行": {
       "shares": 244887.451246021,
       "entry": 10.56,
-      "high": 12.29,
+      "high": 12.42,
       "accel": true,
       "cooldown": 0,
       "loss_streak": 0
