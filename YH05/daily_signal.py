@@ -19,6 +19,7 @@ MAIN_SYM='sh512890'; MAIN_NAME='红利低波'
 GROWTH={'创业板':'sz159915'}
 BB_P=45; BB_S=2.0; RSI_P=14; RSI_L=30; RSI_H=70; ERS=65; BA=0.001
 BARK_KEYS=['eoq8G58fJtDDFxHjhNueGH','WtAJhZtoGpU44fAiJCfJmb','WdcFKWZiVMyDsiDJqoZrvj']
+BARK_ENABLED = False  # 调试阶段关闭Bark推送
 REPO='sunran1996/my_candle'
 SCRIPT = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(SCRIPT, '_positions.json')
@@ -95,6 +96,8 @@ def add_growth(df):
     return df
 
 def send_bark(title,body,url=''):
+    if not BARK_ENABLED:
+        return
     for bk in BARK_KEYS:
         try:
             data=json.dumps({'title':title,'body':body,'url':url}).encode()
