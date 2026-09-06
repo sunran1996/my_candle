@@ -25,7 +25,7 @@ ETF_STOCKS = {'创业板': 'sz159915'}
 ALL_STOCKS = {**CORE_STOCKS, **ETF_STOCKS}
 
 INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
-BARK_ENABLED = True  # 启用Bark(仅推接近信号/买卖信号/交易, 不推纯持仓状态)
+BARK_ENABLED = False  # 调试阶段关闭所有Bark推送; 实盘时改回 True
 BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH']  # 仅推送给第一个用户
 REPO = 'sunran1996/my_candle'
 
