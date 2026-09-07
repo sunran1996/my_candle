@@ -1,17 +1,17 @@
 {
-  "last_date": "2026-09-04",
+  "last_date": "2026-09-07",
   "pos": "MAIN",
-  "shares_main": 6357682.79468172,
+  "shares_main": 7752444.354992955,
   "shares_cy": 0.0,
   "cash": 0.0,
   "entry_main": 1.16,
-  "entry_cy": 3.305,
+  "entry_cy": 3.414,
   "trades": [
     {
-      "date": "2026-03-16",
+      "date": "2026-03-18",
       "name": "创业板",
       "dir": "BUY",
-      "price": 3.349,
+      "price": 3.338,
       "pnl": 0,
       "why": "MACD买入"
     },
@@ -20,7 +20,7 @@
       "name": "创业板",
       "dir": "SELL",
       "price": 3.923,
-      "pnl": 17.1,
+      "pnl": 17.5,
       "why": "卖出"
     },
     {
