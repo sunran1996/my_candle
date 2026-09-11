@@ -23,7 +23,7 @@ plt.rcParams['font.sans-serif'] = [CN]; plt.rcParams['axes.unicode_minus'] = Fal
 STOCKS = {'山东高速': 'sh600350', '渝农商行': 'sh601077', '皖通高速': 'sh600012', '江苏银行': 'sh600919'}
 INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
 BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH','WtAJhZtoGpU44fAiJCfJmb']
-BARK_ENABLED = False  # 调试阶段关闭Bark推送
+BARK_ENABLED = True  # 实盘推送开启
 REPO = 'sunran1996/my_candle'
 
 # 每只股票独立买入+止盈阈值 (2019至今最优)
