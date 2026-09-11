@@ -396,9 +396,9 @@ def _simulate(raw, dfs, dates, inject):
                     real_pct = spend / nav * 100
                     label = f'RSI{row["rsi"]:.0f} 评{sc}'
                     if pos_limit >= MAX_POS_DOUBLE:
-                        label += f' 翻倍(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                        label += f' 翻倍(连{loss_streak[n]}亏,仓位{real_pct:.0f}%)'
                     elif pos_limit > MAX_POS:
-                        label += f' 加仓(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                        label += f' 加仓(连{loss_streak[n]}亏,仓位{real_pct:.0f}%)'
                     trades.append({'date':date,'name':n,'dir':'BUY','price':cp,
                                    'entry_px':cp,'qty':qty,
                                    'pnl':0,'pnl_dollar':0.0,
@@ -1072,8 +1072,8 @@ def live_signal():
                     entry[n] = cp; high[n] = cp
                     real_pct = spend/nav*100
                     label = f'RSI{r.iloc[0]["rsi"]:.0f} 评{sc}'
-                    if pos_limit >= MAX_POS_DOUBLE: label += f' 翻倍(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
-                    elif pos_limit > MAX_POS: label += f' 加仓(连{loss_streak[n]}亏,实{real_pct:.0f}%)'
+                    if pos_limit >= MAX_POS_DOUBLE: label += f' 翻倍(连{loss_streak[n]}亏,仓位{real_pct:.0f}%)'
+                    elif pos_limit > MAX_POS: label += f' 加仓(连{loss_streak[n]}亏,仓位{real_pct:.0f}%)'
                     all_trades.append({'date':date,'name':n,'dir':'BUY','price':cp,'pnl':0,'why':label})
 
         # 创业板 fallback
