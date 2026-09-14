@@ -1420,25 +1420,25 @@ def live_signal():
     if not is_trading_day:
         day_type = '周末' if is_weekend else '假日'
         if alerts:
-            title = f'YH1.0 [{day_type}] ⚠️ {near_short}'
+            title = f'YH08-高股息组合2 [{day_type}] ⚠️ {near_short}'
         elif buy_count >= 1:
-            title = f'YH1.0 [{day_type}] 买入: ' + ' '.join(buy_names)
+            title = f'YH08-高股息组合2 [{day_type}] 买入: ' + ' '.join(buy_names)
         elif holding_count > 0:
-            title = f'YH1.0 [{day_type}] 持仓中 ({holding_count}只)'
+            title = f'YH08-高股息组合2 [{day_type}] 持仓中 ({holding_count}只)'
         else:
-            title = f'YH1.0 [{day_type}] 空仓 (非交易日)'
+            title = f'YH08-高股息组合2 [{day_type}] 空仓 (非交易日)'
     else:
         has_sell = any(t['dir'] == 'SELL' for t in new_trades)
         if has_sell:
-            title = 'YH1.0 🔴 ' + ' '.join(parts)
+            title = 'YH08-高股息组合2 🔴 ' + ' '.join(parts)
         elif new_trades:
-            title = 'YH1.0 ' + ' '.join(parts)
+            title = 'YH08-高股息组合2 ' + ' '.join(parts)
         elif alerts:
-            title = 'YH1.0 ⚠️ ' + near_short
-        elif buy_count >= 3: title = 'YH1.0 多只买入! ' + ' '.join(buy_names)
-        elif buy_count >= 1: title = 'YH1.0 买入: ' + ' '.join(buy_names)
-        elif holding_count > 0: title = f'YH1.0 持仓中 ({holding_count}只)'
-        else: title = 'YH1.0 空仓观望'
+            title = 'YH08-高股息组合2 ⚠️ ' + near_short
+        elif buy_count >= 3: title = 'YH08-高股息组合2 多只买入! ' + ' '.join(buy_names)
+        elif buy_count >= 1: title = 'YH08-高股息组合2 买入: ' + ' '.join(buy_names)
+        elif holding_count > 0: title = f'YH08-高股息组合2 持仓中 ({holding_count}只)'
+        else: title = 'YH08-高股息组合2 空仓观望'
 
     body = '\n'.join(lines)
     if near_body:
