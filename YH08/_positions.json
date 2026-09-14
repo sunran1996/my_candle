@@ -1,0 +1,452 @@
+{
+  "last_date": "2026-09-14",
+  "cash": 14252808.190657744,
+  "total_injected": 2600000,
+  "last_inject_month": 9,
+  "fix_pending": null,
+  "intraday_accel": [],
+  "positions": {
+    "长江电力": {
+      "shares": 302500,
+      "entry": 25.84,
+      "high": 29.57,
+      "accel": true,
+      "cooldown": 0,
+      "loss_streak": 1
+    },
+    "招商银行": {
+      "shares": 286500,
+      "entry": 34.55,
+      "high": 41.83,
+      "accel": true,
+      "cooldown": 0,
+      "loss_streak": 0
+    },
+    "国电电力": {
+      "shares": 1977000,
+      "entry": 4.6,
+      "high": 5.48,
+      "accel": true,
+      "cooldown": 0,
+      "loss_streak": 0
+    },
+    "中国神华": {
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
+      "accel": false,
+      "cooldown": 0,
+      "loss_streak": 0
+    },
+    "创业板": {
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
+      "accel": false,
+      "cooldown": 0,
+      "loss_streak": 3
+    }
+  },
+  "trades": [
+    {
+      "date": "2025-08-14",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 4.4388000000000005,
+      "pnl": 8.000000000000007,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2025-08-15",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 4.29,
+      "pnl": 0,
+      "why": "RSI38 评1牛"
+    },
+    {
+      "date": "2025-08-28",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 36.918,
+      "pnl": 5.000000000000004,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2025-08-29",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 35.73,
+      "pnl": 0,
+      "why": "RSI44 评1牛"
+    },
+    {
+      "date": "2025-09-01",
+      "name": "招商银行",
+      "dir": "SELL",
+      "price": 51.982,
+      "pnl": 39.99999999999999,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2025-09-02",
+      "name": "创业板",
+      "dir": "BUY",
+      "price": 2.848,
+      "pnl": 0,
+      "why": "MACD温和(s0.5)"
+    },
+    {
+      "date": "2025-09-08",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 2.908,
+      "pnl": 2.106741573033699,
+      "why": "换仓→招商银行(卖72%)"
+    },
+    {
+      "date": "2025-09-08",
+      "name": "招商银行",
+      "dir": "BUY",
+      "price": 40.25,
+      "pnl": 0,
+      "why": "RSI39 评1熊"
+    },
+    {
+      "date": "2025-10-14",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 3.1328,
+      "pnl": 10.000000000000009,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2025-10-16",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 40.06,
+      "pnl": 12.118667786174097,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2025-10-29",
+      "name": "创业板",
+      "dir": "BUY",
+      "price": 3.3,
+      "pnl": 0,
+      "why": "MACD温和(s0.2)"
+    },
+    {
+      "date": "2025-11-20",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 3.026,
+      "pnl": -8.303030303030301,
+      "why": "trail"
+    },
+    {
+      "date": "2025-11-24",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 40.19,
+      "pnl": 0,
+      "why": "RSI46 评1牛"
+    },
+    {
+      "date": "2025-11-27",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 5.4,
+      "pnl": 25.874125874125873,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2025-12-08",
+      "name": "创业板",
+      "dir": "BUY",
+      "price": 3.171,
+      "pnl": 0,
+      "why": "MACD温和(s0.2)"
+    },
+    {
+      "date": "2025-12-29",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 3.205,
+      "pnl": 1.0722169662567005,
+      "why": "换仓→国电电力(卖85%)"
+    },
+    {
+      "date": "2025-12-29",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 5.16,
+      "pnl": 0,
+      "why": "RSI31 评2牛"
+    },
+    {
+      "date": "2026-01-14",
+      "name": "招商银行",
+      "dir": "SELL",
+      "price": 38.01,
+      "pnl": -5.565217391304356,
+      "why": "trail"
+    },
+    {
+      "date": "2026-01-14",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 4.73,
+      "pnl": -8.333333333333325,
+      "why": "trail"
+    },
+    {
+      "date": "2026-01-15",
+      "name": "招商银行",
+      "dir": "BUY",
+      "price": 38.05,
+      "pnl": 0,
+      "why": "RSI30 评2熊"
+    },
+    {
+      "date": "2026-01-15",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 3.352,
+      "pnl": 5.7079785556606755,
+      "why": "换仓→国电电力(卖53%)"
+    },
+    {
+      "date": "2026-01-15",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 4.72,
+      "pnl": 0,
+      "why": "RSI22 评3熊"
+    },
+    {
+      "date": "2026-01-16",
+      "name": "长江电力",
+      "dir": "SELL",
+      "price": 25.57,
+      "pnl": -5.261207854761018,
+      "why": "trail"
+    },
+    {
+      "date": "2026-01-19",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 3.318,
+      "pnl": 4.635761589403975,
+      "why": "换仓→长江电力(全换仓)"
+    },
+    {
+      "date": "2026-01-19",
+      "name": "长江电力",
+      "dir": "BUY",
+      "price": 25.84,
+      "pnl": 0,
+      "why": "RSI35 评1熊"
+    },
+    {
+      "date": "2026-02-02",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 4.42,
+      "pnl": -6.355932203389825,
+      "why": "trail"
+    },
+    {
+      "date": "2026-02-03",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 4.43,
+      "pnl": 0,
+      "why": "RSI25 评2熊 加仓(连2亏,仓位25%)"
+    },
+    {
+      "date": "2026-03-03",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 44.69,
+      "pnl": 11.196815128141324,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-03-16",
+      "name": "创业板",
+      "dir": "BUY",
+      "price": 3.349,
+      "pnl": 0,
+      "why": "MACD温和(s0.2)"
+    },
+    {
+      "date": "2026-03-23",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 6.201999999999999,
+      "pnl": 39.99999999999999,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2026-03-30",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 4.75,
+      "pnl": 0,
+      "why": "RSI46 评1熊"
+    },
+    {
+      "date": "2026-03-31",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 3.182,
+      "pnl": -4.986563153180057,
+      "why": "换仓→中国神华(卖81%)"
+    },
+    {
+      "date": "2026-03-31",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 45.6,
+      "pnl": 0,
+      "why": "RSI51 评1牛"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 3.141,
+      "pnl": -6.210809196775157,
+      "why": "trail"
+    },
+    {
+      "date": "2026-05-13",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 43.7,
+      "pnl": -4.1666666666666625,
+      "why": "trail"
+    },
+    {
+      "date": "2026-05-14",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 44.06,
+      "pnl": 0,
+      "why": "RSI42 评1牛"
+    },
+    {
+      "date": "2026-05-22",
+      "name": "招商银行",
+      "dir": "SELL",
+      "price": 36.03,
+      "pnl": -5.3088042049934225,
+      "why": "trail"
+    },
+    {
+      "date": "2026-05-25",
+      "name": "招商银行",
+      "dir": "BUY",
+      "price": 35.95,
+      "pnl": 0,
+      "why": "RSI23 评2熊 加仓(连2亏,仓位26%)"
+    },
+    {
+      "date": "2026-06-02",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 5.16,
+      "pnl": 8.631578947368435,
+      "why": "tp20"
+    },
+    {
+      "date": "2026-06-08",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 49.52,
+      "pnl": 12.392192464820706,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-06-15",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 42.33,
+      "pnl": 0,
+      "why": "RSI35 评1熊"
+    },
+    {
+      "date": "2026-06-18",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 4.6,
+      "pnl": 0,
+      "why": "RSI37 评1熊"
+    },
+    {
+      "date": "2026-06-25",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 38.43,
+      "pnl": -9.213323883770375,
+      "why": "trail"
+    },
+    {
+      "date": "2026-06-26",
+      "name": "招商银行",
+      "dir": "SELL",
+      "price": 50.33,
+      "pnl": 39.99999999999999,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2026-06-26",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 38.6,
+      "pnl": 0,
+      "why": "RSI27 评1熊"
+    },
+    {
+      "date": "2026-06-29",
+      "name": "创业板",
+      "dir": "BUY",
+      "price": 4.236,
+      "pnl": 0,
+      "why": "MACD温和(s0.2)"
+    },
+    {
+      "date": "2026-06-30",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 4.364,
+      "pnl": 3.021718602455148,
+      "why": "换仓→招商银行(卖75%)"
+    },
+    {
+      "date": "2026-06-30",
+      "name": "招商银行",
+      "dir": "BUY",
+      "price": 34.55,
+      "pnl": 0,
+      "why": "RSI30 评1熊"
+    },
+    {
+      "date": "2026-07-06",
+      "name": "创业板",
+      "dir": "SELL",
+      "price": 3.97,
+      "pnl": -6.279508970727088,
+      "why": "trail"
+    },
+    {
+      "date": "2026-07-17",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 43.95,
+      "pnl": 13.86010362694301,
+      "why": "accel_tp25"
+    }
+  ]
+}
