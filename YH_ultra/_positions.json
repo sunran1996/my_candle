@@ -1,5 +1,5 @@
 {
-  "last_date": "2026-09-11",
+  "last_date": "2026-09-14",
   "cash": 0.0,
   "total_injected": 2660000,
   "last_inject_month": 9,
@@ -7,7 +7,7 @@
     "山东高速": {
       "shares": 295044.36325169174,
       "entry": 10.25,
-      "high": 10.25,
+      "high": 10.38,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 2
