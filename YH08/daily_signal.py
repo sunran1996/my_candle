@@ -25,6 +25,8 @@ ETF_STOCKS = {'创业板': 'sz159915'}
 ALL_STOCKS = {**CORE_STOCKS, **ETF_STOCKS}
 
 INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.25
+# 每只核心股默认仓位上限 (创业板用独立 pos_frac, 不在此列). 赚钱多的标的上调.
+BASE_POS = {'长江电力': 0.25, '招商银行': 0.25, '国电电力': 0.35, '中国神华': 0.35}
 BARK_ENABLED = True   # 实盘推送开启
 BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH']  # 仅推送给第一个用户
 REPO = 'sunran1996/my_candle'
@@ -55,6 +57,8 @@ BUY_PARAMS = {
 TRAIL_STOP     = 0.08       # 移动止损8% (2026-09 牛熊扫描重调)
 HARD_STOP      = 0.12       # 硬止损12%
 COOLDOWN       = 40         # 硬止损后冷却天数
+NAV_STOP       = None       # 组合回撤止损(实验): 全区间Calmar升但滚动验证否决(2016-2021窗口回撤不降反升、收益大降), 默认关闭
+NAV_COOL       = 40         # 组合止损后的全局冷却天数(仅 NAV_STOP 开启时生效)
 MAX_POS_BOOST  = 0.35       # 连亏≥2 + 有其他持仓 → 加仓35%
 MAX_POS_DOUBLE = 0.50       # 连亏≥4 + 有其他持仓 → 翻倍50%
 LOSS_STREAK_N  = 2          # 连续止损N次触发加仓
@@ -154,8 +158,11 @@ def fetch():
 
 def add_indicators(df):
     df = df.copy(); c = df['close']
-    df['ma20'] = c.rolling(20).mean(); df['ma60'] = c.rolling(60).mean()
-    df['ma120'] = c.rolling(120).mean()
+    df['ma20'] = c.rolling(20).mean(); df['ma30'] = c.rolling(30).mean()
+    df['ma40'] = c.rolling(40).mean(); df['ma50'] = c.rolling(50).mean()
+    df['ma60'] = c.rolling(60).mean(); df['ma90'] = c.rolling(90).mean()
+    df['ma120'] = c.rolling(120).mean(); df['ma150'] = c.rolling(150).mean()
+    df['ma180'] = c.rolling(180).mean(); df['ma250'] = c.rolling(250).mean()
     df['bb_ma'] = c.rolling(20).mean(); df['bb_std'] = c.rolling(20).std()
     df['bb_up'] = df['bb_ma'] + 2*df['bb_std']; df['bb_lo'] = df['bb_ma'] - 2*df['bb_std']
     df['bb_up_d2'] = df['bb_up'].diff().diff()  # 上轨二阶导: >0加速扩张(趋势延续)
@@ -169,12 +176,14 @@ def add_indicators(df):
                 l.ewm(alpha=1/14,adjust=False).mean().replace(0, np.nan))
     return df
 
+REGIME_MA = 50   # 牛熊分界 MA 周期 (扫描调优: MA50 样本外最优 Calmar 10.63)
+
 def market_regime(row):
-    """牛熊判断: 现价 ≥ MA120 判牛市(True), 否则熊市(False). MA120未算出(数据不足)按牛市处理."""
-    ma120 = row.get('ma120')
-    if pd.isna(ma120):
+    """牛熊判断: 现价 ≥ MA{REGIME_MA} 判牛市(True), 否则熊市(False). MA未算出(数据不足)按牛市处理."""
+    ma = row.get(f'ma{REGIME_MA}')
+    if pd.isna(ma):
         return True
-    return bool(row['close'] >= ma120)
+    return bool(row['close'] >= ma)
 
 
 def get_params(row, name):
@@ -302,6 +311,8 @@ def _simulate(raw, dfs, dates, inject):
     total_injected = INIT
     stock_pnl_dollar = {n: 0.0 for n in ALL_STOCKS}
     navs = []; trades = []
+    nav_peak = INIT          # 组合净值峰值(供 NAV_STOP 判断)
+    nav_cool = 0             # 组合止损后的全局冷却剩余天数
 
     for date in dates:
         # 每月定投
@@ -368,12 +379,38 @@ def _simulate(raw, dfs, dates, inject):
 
         nav = cash + sum(shares[n]*px.get(n,0) for n in ALL_STOCKS)
 
+        # ── 组合回撤止损(NAV_STOP): 净值从峰值回撤超阈值 → 清仓 + 全局冷却 ──
+        if NAV_STOP:
+            if nav > nav_peak: nav_peak = nav
+            if nav_peak > 0 and (nav - nav_peak) / nav_peak <= -NAV_STOP:
+                for n in ALL_STOCKS:
+                    if shares[n] <= 0: continue
+                    cp = px.get(n, 0)
+                    if cp <= 0: continue
+                    qty = shares[n]; entry_px = entry[n]
+                    pnl_dollar = qty * (cp * (1-COMM-SLIP) - entry_px)
+                    stock_pnl_dollar[n] += pnl_dollar
+                    cash += qty * cp * (1-COMM-SLIP)
+                    pnl_real = cp / entry_px - 1
+                    shares[n] = 0; entry[n] = 0; high[n] = 0; accel[n] = False
+                    sold_today[n] = True
+                    trades.append({'date': date, 'name': n, 'dir': 'SELL', 'price': cp,
+                                   'entry_px': entry_px, 'qty': qty,
+                                   'pnl': pnl_real*100, 'pnl_dollar': pnl_dollar,
+                                   'nav': _nav(cash, shares, px),
+                                   'reason': f'组合止损{pnl_real*100:+.1f}%'})
+                nav_cool = NAV_COOL
+                nav_peak = nav
+                nav = cash + sum(shares[n]*px.get(n,0) for n in ALL_STOCKS)
+
         # 冷却递减
         for n in ALL_STOCKS:
             if cooldown[n] > 0: cooldown[n] -= 1
+        if nav_cool > 0: nav_cool -= 1
 
         # ── 买入 第一阶段: 核心4股 (最高优先级) ──
         for n in CORE_STOCKS:
+            if nav_cool > 0: break
             if sold_today[n]: continue
             if shares[n] > 0: continue
             if cooldown[n] > 0: continue
@@ -385,13 +422,14 @@ def _simulate(raw, dfs, dates, inject):
             if not ok: continue
 
             # 连续止损+有其他持仓 → 阶梯加仓
+            base = BASE_POS.get(n, MAX_POS)
             has_other = sum(1 for nn in CORE_STOCKS if nn != n and shares[nn] > 0) > 0
             if has_other:
-                if loss_streak[n] >= 4: pos_limit = MAX_POS_DOUBLE
-                elif loss_streak[n] >= LOSS_STREAK_N: pos_limit = MAX_POS_BOOST
-                else: pos_limit = MAX_POS
+                if loss_streak[n] >= 4: pos_limit = max(MAX_POS_DOUBLE, base)
+                elif loss_streak[n] >= LOSS_STREAK_N: pos_limit = max(MAX_POS_BOOST, base)
+                else: pos_limit = base
             else:
-                pos_limit = MAX_POS
+                pos_limit = base
             target_val = nav * pos_limit
             if cash < target_val and '创业板' in ETF_STOCKS:
                 cy = '创业板'
@@ -441,7 +479,7 @@ def _simulate(raw, dfs, dates, inject):
         # ── 买入 第二阶段: 创业板 (持仓<2时启用, MACD驱动) ──
         core_held = sum(1 for n in CORE_STOCKS if shares[n] > 0)
         n = '创业板'
-        if core_held < 4 and shares[n] <= 0 and cooldown[n] <= 0:
+        if nav_cool <= 0 and core_held < 4 and shares[n] <= 0 and cooldown[n] <= 0:
             cp = px.get(n, 0); r = dfs[n][dfs[n]['date']==date]
             if cp > 0 and len(r) > 0:
                 row = r.iloc[0]
@@ -453,7 +491,8 @@ def _simulate(raw, dfs, dates, inject):
                     ok_cyber = False
                 strength = 0.0
                 if ok_cyber:
-                    hist_recent = dfs[n]['macd_hist'].iloc[-40:].dropna()
+                    idx = r.index[0]  # 当前行在 dfs[n] 中的位置, 取截至当天的最近40日(无未来泄漏)
+                    hist_recent = dfs[n]['macd_hist'].iloc[max(0, idx-39):idx+1].dropna()
                     if len(hist_recent) > 10:
                         max_hist = hist_recent.abs().max()
                         strength = abs(hist) / max_hist if max_hist > 0 else 0
@@ -1075,12 +1114,13 @@ def live_signal():
             if cp <= 0 or len(r)==0: continue
             ok, sc = check_buy(r.iloc[0], n)
             if not ok: continue
+            base = BASE_POS.get(n, MAX_POS)
             has_other = sum(1 for nn in CORE_STOCKS if nn != n and shares[nn] > 0) > 0
             if has_other:
-                if loss_streak[n] >= 4: pos_limit = MAX_POS_DOUBLE
-                elif loss_streak[n] >= LOSS_STREAK_N: pos_limit = MAX_POS_BOOST
-                else: pos_limit = MAX_POS
-            else: pos_limit = MAX_POS
+                if loss_streak[n] >= 4: pos_limit = max(MAX_POS_DOUBLE, base)
+                elif loss_streak[n] >= LOSS_STREAK_N: pos_limit = max(MAX_POS_BOOST, base)
+                else: pos_limit = base
+            else: pos_limit = base
             target_val = nav * pos_limit
             if cash < target_val and '创业板' in ETF_STOCKS:
                 cy = '创业板'; cy_px = px.get(cy, 0)
@@ -1171,7 +1211,7 @@ def live_signal():
             cash, shares, entry, high, accel, cooldown, loss_streak, last_inject_month, tc = snap_today
             all_trades = all_trades[:tc]
         hist = [d for d in dates if d < today]
-        latest_date = max(hist) if hist else (state['last_date'] if state else raw['山东高速']['date'].iloc[-1])
+        latest_date = max(hist) if hist else (state['last_date'] if state else max(raw[n]['date'].iloc[-1] for n in ALL_STOCKS))
     save_state(latest_date, cash, total_injected, last_inject_month,
                shares, entry, high, accel, cooldown, loss_streak, all_trades,
                fix_pending, intraday_accel)
