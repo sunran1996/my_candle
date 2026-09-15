@@ -196,6 +196,19 @@ def check_buy(row, name):
     if rsi <= 30: sc += 1
     return sc >= 1, sc
 
+
+def sell_levels(entry_px, high_px, accel_flag, tp, tp_hi):
+    """持仓卖出挂单价: 返回 (止损价, 止盈价)."""
+    if accel_flag:
+        floor = entry_px * (1 + tp)
+        stop_px = max(high_px * (1 - TRAIL_STOP), floor)
+        target_px = entry_px * (1 + tp_hi)
+    else:
+        stop_px = high_px * (1 - TRAIL_STOP)
+        target_px = entry_px * (1 + tp)
+    return stop_px, target_px
+
+
 NEAR_PCT      = 0.03   # 接近买点提示阈值(3%)
 NEAR_SELL_PCT = 0.015  # 接近卖点提示阈值(1.5%), 卖点更精确避免过早提醒
 
@@ -221,15 +234,8 @@ def proximity_alert(row, name, holding, entry_px, high_px, accel_flag, cooldown_
         return None
     else:
         tp = bp.get('tp', 0.15); tp_hi = bp.get('tp_hi', 0.20)
-        if accel_flag:
-            floor = entry_px * (1 + tp)
-            stop_px = max(high_px * (1 - TRAIL_STOP), floor)
-            target_px = entry_px * (1 + tp_hi)
-            stop_label = '锁盈'
-        else:
-            stop_px = high_px * (1 - TRAIL_STOP)
-            target_px = entry_px * (1 + tp)
-            stop_label = '移动止损'
+        stop_px, target_px = sell_levels(entry_px, high_px, accel_flag, tp, tp_hi)
+        stop_label = '锁盈' if accel_flag else '移动止损'
         # 止损/锁盈本质是"从高点回落"才触发, 现价须低于最高价才预警, 否则创新高时误报
         pulled_back = high_px > 0 and close < high_px
         if pulled_back and stop_px > 0 and stop_px < close <= stop_px * (1 + NEAR_SELL_PCT):
@@ -1205,13 +1211,21 @@ def live_signal():
         if pa:
             alerts.append((name, pa[0], pa[1]))
 
+        bp = get_params(row, name)
+        order = ''   # 挂单价格: 买入=BB触发价, 持仓=止损/止盈
         if buy_ok and not holding and name not in traded_buy:
             sig = '买入'
             buy_list.append((name, sc))
+            buy_px = bb_lo + bp.get('bb', 0) * bb_range
+            order = f' 挂单≤{buy_px:.2f}'
         elif name in traded_buy:
             sig = '买入'   # 今天已成交(实时价)
         elif holding:
             sig = '持仓'
+            tp = bp.get('tp', 0.15); tp_hi = bp.get('tp_hi', 0.20)
+            stop_px, target_px = sell_levels(positions[name], high.get(name, 0),
+                                             accel.get(name, False), tp, tp_hi)
+            order = f' 止损{stop_px:.2f}/止盈{target_px:.2f}'
         else:
             sig = '空仓'
 
@@ -1224,7 +1238,7 @@ def live_signal():
             extra += f' ⚡连亏{loss_streak[name]}'
         elif loss_streak.get(name, 0) >= 2:
             extra += f' 连亏{loss_streak[name]}'
-        lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%{extra}')
+        lines.append(f'{sig} | {name} {close:.2f} RSI{rsi:.0f} BB{bb_pos:.0f}%{extra}{order}')
 
     # 去重: 同标的在冷却时间内只提醒一次, 避免盘中每10分钟重复推送
     sent_map = _load_sent_alerts()
@@ -1412,7 +1426,7 @@ def live_signal():
                     alert_body += f"🔄 {d} {t['why']} {pnl_s}\n"
                 else:
                     parts.append(f"卖{t['name']}{pnl_s}")
-                    alert_body += f"🟢 {d} 卖出 {t['name']} {pnl_s} ({why_cn})\n"
+                    alert_body += f"🟢 {d} 卖出 {t['name']} @{t['price']:.2f} {pnl_s} ({why_cn})\n"
 
     # 是否推送: 有接近信号/买入信号/交易变动才推, 纯持仓/空仓状态不推
     actionable = len(alerts) > 0 or buy_count > 0 or len(new_trades) > 0
