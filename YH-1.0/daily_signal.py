@@ -419,7 +419,8 @@ def _simulate(raw, dfs, dates, inject):
                     ok_cyber = False
                 strength = 0.0
                 if ok_cyber:
-                    hist_recent = dfs[n]['macd_hist'].iloc[-40:].dropna()
+                    idx = r.index[0]  # 取截至当天的最近40日(无未来泄漏)
+                    hist_recent = dfs[n]['macd_hist'].iloc[max(0, idx-39):idx+1].dropna()
                     if len(hist_recent) > 10:
                         max_hist = hist_recent.abs().max()
                         strength = abs(hist) / max_hist if max_hist > 0 else 0
