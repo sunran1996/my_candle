@@ -15,6 +15,7 @@ BB_PERIOD = 45; BB_STD = 2.0
 RSI_PERIOD = 14; RSI_OVERSOLD = 30; RSI_OVERBOUGHT = 70
 EXPAND_RSI_SELL = 65; BB_ACCEL_UP = 0.001
 BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH','WtAJhZtoGpU44fAiJCfJmb']
+BARK_ENABLED = False  # 调试阶段关闭Bark推送
 REPO = 'sunran1996/my_candle'
 
 # 跨平台字体
@@ -316,6 +317,8 @@ def upload_chart(token, img_bytes):
     return f'https://cdn.jsdelivr.net/gh/{REPO}@main/YH02/{filename}'
 
 def send_bark(title, body, chart_url):
+    if not BARK_ENABLED:
+        return
     for bk in BARK_KEYS:
         try:
             data = json.dumps({'title': title, 'body': body, 'url': chart_url}).encode()
