@@ -1,0 +1,42 @@
+
+name: YH77 收盘信号推送
+
+on:
+  schedule:
+    # A股收盘 15:00(北京时间)后触发. GitHub Actions 用 UTC, 15:35 北京 = 07:35 UTC.
+    # 周一到周五(1-5). 注: 法定节假日(工作日但休市)也会触发, 会基于最近交易日数据推送(无害冗余).
+    #   数据更新早可改 15:05(07:05 UTC)= '5 7 * * 1-5'; 更新晚可改 16:00(08:00 UTC)= '0 8 * * 1-5'.
+    - cron: '35 7 * * 1-5'
+  workflow_dispatch: {}   # 手动触发: Actions → 本 workflow → Run workflow
+
+concurrency:
+  group: yh77-close-alert
+  cancel-in-progress: false
+
+jobs:
+  close-alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install akshare pandas numpy matplotlib mplfinance
+
+      - name: 运行收盘信号并推送 Bark
+        env:
+          TZ: Asia/Shanghai        # 用北京时间判断"今天/交易日", 避免 UTC 日期错位
+          MPLBACKEND: Agg          # 无界面环境绘图
+          # 可选: 想让 Bark 消息附上 K线图(默认只有文字价格), 取消下一行注释并配置 secret:
+          #   仓库 Settings → Secrets → Actions 里新增 GH_TOKEN = 你的 GitHub 令牌(需 repo 权限, 即本地用的同一个).
+          #   注意: 开启后 --live 会把代码/持仓状态/图表回写到仓库, 覆盖 YH77/_positions.json.
+          # GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: python YH77/daily_signal.py --live
