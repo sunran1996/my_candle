@@ -1,6 +1,6 @@
 {
-  "last_date": "2026-09-18",
-  "cash": 2672291.1829875703,
+  "last_date": "2026-09-21",
+  "cash": 5530146.057536002,
   "total_injected": 2660000,
   "last_inject_month": 9,
   "positions": {
@@ -21,12 +21,12 @@
       "loss_streak": 0
     },
     "皖通高速": {
-      "shares": 184570.59224906433,
-      "entry": 15.5,
-      "high": 16.91,
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
       "accel": false,
       "cooldown": 0,
-      "loss_streak": 0
+      "loss_streak": 1
     },
     "江苏银行": {
       "shares": 223916.5513147221,
@@ -38,14 +38,6 @@
     }
   },
   "trades": [
-    {
-      "date": "2025-08-18",
-      "name": "皖通高速",
-      "dir": "BUY",
-      "price": 14.92,
-      "pnl": 0,
-      "why": "RSI33 评2"
-    },
     {
       "date": "2025-08-19",
       "name": "渝农商行",
@@ -436,6 +428,14 @@
       "dir": "SELL",
       "price": 6.53,
       "pnl": 6.873977086743044,
+      "why": "trail"
+    },
+    {
+      "date": "2026-09-21",
+      "name": "皖通高速",
+      "dir": "SELL",
+      "price": 15.49,
+      "pnl": -0.0645161290322549,
       "why": "trail"
     }
   ]
