@@ -3,7 +3,7 @@
   "cash": 59852.75277438387,
   "total_injected": 2600000,
   "last_inject_month": 9,
-  "fix_pending": "2026-09-22",
+  "fix_pending": null,
   "intraday_accel": [],
   "positions": {
     "山东高速": {
@@ -25,7 +25,7 @@
     "皖通高速": {
       "shares": 192100,
       "entry": 15.36,
-      "high": 15.36,
+      "high": 15.44,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 1
