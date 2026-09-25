@@ -1,5 +1,5 @@
 {
-  "last_date": "2026-09-23",
+  "last_date": "2026-09-24",
   "cash": 2733210.8586740247,
   "total_injected": 2660000,
   "last_inject_month": 9,
@@ -23,7 +23,7 @@
     "皖通高速": {
       "shares": 182019.29848843964,
       "entry": 15.36,
-      "high": 15.43,
+      "high": 15.54,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 1
