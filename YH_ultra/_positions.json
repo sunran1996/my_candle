@@ -1,8 +1,8 @@
 {
-  "last_date": "2026-09-30",
-  "cash": 2733210.8586740247,
-  "total_injected": 2660000,
-  "last_inject_month": 9,
+  "last_date": "2026-10-08",
+  "cash": 2753210.8586740247,
+  "total_injected": 2680000,
+  "last_inject_month": 10,
   "positions": {
     "山东高速": {
       "shares": 295044.36325169174,
@@ -23,7 +23,7 @@
     "皖通高速": {
       "shares": 182019.29848843964,
       "entry": 15.36,
-      "high": 15.58,
+      "high": 15.94,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 1
