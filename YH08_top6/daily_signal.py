@@ -659,21 +659,22 @@ def run_backtest(start_str=None, inject=True):
         print(f"  无定投(纯100w): 累计{ret0:+.1f}%  年化{ann0:+.1f}%  终值{final0/10000:.0f}w")
 
     ndf['year'] = ndf['date'].dt.year
-    print(f"\n  {'年份':<6} {'组合':>8} {'回撤':>7}  {'长江电力':>8} {'招商银行':>8} {'国电电力':>8} {'中国神华':>8} {'创业板':>8}")
+    names = list(ALL_STOCKS)
+    print(f"\n  {'年份':<6} {'组合':>8} {'回撤':>7}  " + '  '.join(f'{n:>8}' for n in names))
     for yr, grp in ndf.groupby('year'):
         if len(grp)<10: continue
         yr_ret = ((grp['nav'].iloc[-1]/grp['injected'].iloc[-1])/(grp['nav'].iloc[0]/grp['injected'].iloc[0])-1)*100
         yr_mdd = ((grp['nav']-grp['nav'].cummax())/grp['nav'].cummax()).min()*100
         yr_sells = td[(td['dir']=='SELL') & (td['date'].dt.year==yr)]
         parts = []
-        for name in ALL_STOCKS:
+        for name in names:
             ss = yr_sells[yr_sells['name']==name]
             if len(ss) > 0:
                 w = ss['pnl'].sum(); n = len(ss)
                 parts.append(f'{n}笔 {w:+.1f}%')
             else:
                 parts.append('—')
-        print(f"  {yr:<6} {yr_ret:>+7.1f}% {yr_mdd:>+6.1f}%  {parts[0]:>8}  {parts[1]:>8}  {parts[2]:>8}  {parts[3]:>8}  {parts[4]:>8}")
+        print(f"  {yr:<6} {yr_ret:>+7.1f}% {yr_mdd:>+6.1f}%  " + '  '.join(f'{p:>8}' for p in parts))
 
     # ── 图表 ──
     RED = '#CC0000'; GREEN = '#008800'; PURPLE = '#9B59B6'; BLUE = '#3498DB'
@@ -1488,25 +1489,25 @@ def live_signal():
     if not is_trading_day:
         day_type = '周末' if is_weekend else '假日'
         if alerts:
-            title = f'YH08-高股息组合2 [{day_type}] ⚠️ {near_short}'
+            title = f'YH08-Top6六股 [{day_type}] ⚠️ {near_short}'
         elif buy_count >= 1:
-            title = f'YH08-高股息组合2 [{day_type}] 买入: ' + ' '.join(buy_names)
+            title = f'YH08-Top6六股 [{day_type}] 买入: ' + ' '.join(buy_names)
         elif holding_count > 0:
-            title = f'YH08-高股息组合2 [{day_type}] 持仓中 ({holding_count}只)'
+            title = f'YH08-Top6六股 [{day_type}] 持仓中 ({holding_count}只)'
         else:
-            title = f'YH08-高股息组合2 [{day_type}] 空仓 (非交易日)'
+            title = f'YH08-Top6六股 [{day_type}] 空仓 (非交易日)'
     else:
         has_sell = any(t['dir'] == 'SELL' for t in new_trades)
         if has_sell:
-            title = 'YH08-高股息组合2 🔴 ' + ' '.join(parts)
+            title = 'YH08-Top6六股 🔴 ' + ' '.join(parts)
         elif new_trades:
-            title = 'YH08-高股息组合2 ' + ' '.join(parts)
+            title = 'YH08-Top6六股 ' + ' '.join(parts)
         elif alerts:
-            title = 'YH08-高股息组合2 ⚠️ ' + near_short
-        elif buy_count >= 3: title = 'YH08-高股息组合2 多只买入! ' + ' '.join(buy_names)
-        elif buy_count >= 1: title = 'YH08-高股息组合2 买入: ' + ' '.join(buy_names)
-        elif holding_count > 0: title = f'YH08-高股息组合2 持仓中 ({holding_count}只)'
-        else: title = 'YH08-高股息组合2 空仓观望'
+            title = 'YH08-Top6六股 ⚠️ ' + near_short
+        elif buy_count >= 3: title = 'YH08-Top6六股 多只买入! ' + ' '.join(buy_names)
+        elif buy_count >= 1: title = 'YH08-Top6六股 买入: ' + ' '.join(buy_names)
+        elif holding_count > 0: title = f'YH08-Top6六股 持仓中 ({holding_count}只)'
+        else: title = 'YH08-Top6六股 空仓观望'
 
     body = '\n'.join(lines)
     if near_body:
