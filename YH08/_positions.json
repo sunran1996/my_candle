@@ -1,5 +1,5 @@
 {
-  "last_date": "2026-10-14",
+  "last_date": "2026-10-15",
   "cash": 20987.46236643009,
   "total_injected": 2640000,
   "last_inject_month": 10,
@@ -9,7 +9,7 @@
     "长江电力": {
       "shares": 302500,
       "entry": 25.84,
-      "high": 29.57,
+      "high": 29.63,
       "accel": true,
       "cooldown": 0,
       "loss_streak": 1
@@ -33,7 +33,7 @@
     "中国神华": {
       "shares": 306500,
       "entry": 46.48,
-      "high": 50.77,
+      "high": 50.79,
       "accel": true,
       "cooldown": 0,
       "loss_streak": 0
