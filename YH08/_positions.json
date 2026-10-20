@@ -3,7 +3,7 @@
   "cash": 15799423.562366432,
   "total_injected": 2640000,
   "last_inject_month": 10,
-  "fix_pending": "2026-10-19",
+  "fix_pending": null,
   "intraday_accel": [],
   "positions": {
     "长江电力": {
