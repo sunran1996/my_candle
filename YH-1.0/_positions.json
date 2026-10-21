@@ -1,5 +1,5 @@
 {
-  "last_date": "2026-10-19",
+  "last_date": "2026-10-20",
   "cash": 79852.75277438387,
   "total_injected": 2740000,
   "last_inject_month": 10,
@@ -9,7 +9,7 @@
     "山东高速": {
       "shares": 300100,
       "entry": 10.25,
-      "high": 11.3,
+      "high": 11.38,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 2
@@ -17,7 +17,7 @@
     "渝农商行": {
       "shares": 431526.848632448,
       "entry": 6.11,
-      "high": 7.15,
+      "high": 7.19,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 1
