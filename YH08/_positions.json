@@ -1,18 +1,18 @@
 {
-  "last_date": "2026-10-20",
-  "cash": 15799423.562366432,
+  "last_date": "2026-10-22",
+  "cash": 37543152.59036643,
   "total_injected": 2640000,
   "last_inject_month": 10,
-  "fix_pending": null,
+  "fix_pending": "2026-10-22",
   "intraday_accel": [],
   "positions": {
     "长江电力": {
-      "shares": 302500,
-      "entry": 25.84,
-      "high": 29.8,
-      "accel": true,
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
+      "accel": false,
       "cooldown": 0,
-      "loss_streak": 1
+      "loss_streak": 0
     },
     "招商银行": {
       "shares": 286500,
@@ -23,10 +23,10 @@
       "loss_streak": 0
     },
     "国电电力": {
-      "shares": 1977000,
-      "entry": 4.6,
-      "high": 5.52,
-      "accel": true,
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
+      "accel": false,
       "cooldown": 0,
       "loss_streak": 0
     },
@@ -48,22 +48,6 @@
     }
   },
   "trades": [
-    {
-      "date": "2025-08-28",
-      "name": "中国神华",
-      "dir": "SELL",
-      "price": 36.918,
-      "pnl": 5.000000000000004,
-      "why": "accel_floor"
-    },
-    {
-      "date": "2025-08-29",
-      "name": "中国神华",
-      "dir": "BUY",
-      "price": 35.73,
-      "pnl": 0,
-      "why": "RSI44 评1牛"
-    },
     {
       "date": "2025-09-01",
       "name": "招商银行",
@@ -447,6 +431,22 @@
       "price": 51.5,
       "pnl": 10.800344234079184,
       "why": "accel_tp25"
+    },
+    {
+      "date": "2026-10-22",
+      "name": "长江电力",
+      "dir": "SELL",
+      "price": 29.82,
+      "pnl": 15.402476780185758,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-10-22",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 6.4399999999999995,
+      "pnl": 39.99999999999999,
+      "why": "accel_floor"
     }
   ]
 }
