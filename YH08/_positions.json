@@ -1,5 +1,5 @@
 {
-  "last_date": "2026-10-23",
+  "last_date": "2026-10-26",
   "cash": 20214785.243427657,
   "total_injected": 2640000,
   "last_inject_month": 10,
@@ -25,7 +25,7 @@
     "国电电力": {
       "shares": 3478200,
       "entry": 4.98,
-      "high": 5.08,
+      "high": 5.17,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 0
