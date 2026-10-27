@@ -21,6 +21,20 @@ BB_P=45;BB_S=2.0;RSI_P=14;RSI_L=30;RSI_H=70;ERS=65;BA=0.001
 BARK_KEYS=['eoq8G58fJtDDFxHjhNueGH']  # 单推送防重复
 BARK_ENABLED = False  # 调试阶段关闭Bark推送
 REPO='sunran1996/my_candle'
+SCRIPT=os.path.dirname(os.path.abspath(__file__))
+STATE_FILE=os.path.join(SCRIPT,'_pos_yh04.json')
+
+def load_pos():
+    """读取上次持仓状态: {'pos': '红利低波'|成长名|'现金', 'hse': 成长最高价}. 无则默认现金."""
+    try:
+        with open(STATE_FILE,encoding='utf-8')as f: return json.load(f)
+    except: return {'pos':'现金','hse':0.0}
+
+def save_pos(pos,hse):
+    try:
+        with open(STATE_FILE,'w',encoding='utf-8')as f:
+            json.dump({'pos':pos,'hse':hse,'date':pd.Timestamp.now().strftime('%Y-%m-%d')},f,ensure_ascii=False)
+    except: pass
 
 def fetch():
     dfs={}
@@ -103,15 +117,51 @@ def main():
         if near_sell: warn=' ⚠ 接近卖出'
         elif near_buy: warn=' ⚠ 接近买入'
 
-        # 状态判断
-        if buy_ok:
-            action=f'🔴 买入红利低波'; detail=f'全仓{MAIN_NAME}@{main_px:.3f}'
-        elif sell_ok and leader_macd>0:
-            action=f'🟢 换仓{leader}'; detail=f'{MAIN_NAME}→{leader}@{leader_px:.3f}'
-        elif sell_ok:
-            action=f'⚫ 现金等待'; detail=f'{MAIN_NAME}已卖出, MACD全负'
-        else:
-            action=f'⚪ 持有{warn}'; detail=f'{MAIN_NAME}@{main_px:.3f}'
+        # 状态判断(基于持仓文件: 空仓/持有成长 不再误报"持有红利低波")
+        st=load_pos(); cur=st.get('pos','现金'); hse=st.get('hse',0.0)
+        new_pos=cur; new_hse=hse
+
+        # 成长候选(排名第一)买点: MACD>0 且 价>MA20(与回测一致)
+        g_buy_ok=False
+        if leader!='—' and leader in dfs_g:
+            li=min(g_idx,len(dfs_g[leader])-1)
+            g_ma20=dfs_g[leader]['ma20'].iloc[li]
+            g_buy_ok=(leader_macd>0)and(pd.isna(g_ma20)or leader_px>g_ma20)
+
+        if cur=='红利低波':
+            if sell_ok and leader_macd>0:
+                action=f'🟢 换仓{leader}'; new_pos=leader; new_hse=leader_px
+                detail=f'{MAIN_NAME}→{leader}@{leader_px:.3f}'
+            elif sell_ok:
+                action=f'⚫ 现金等待'; new_pos='现金'; new_hse=0.0
+                detail=f'{MAIN_NAME}已卖出, MACD全负'
+            else:
+                action=f'⚪ 持有红利低波{warn}'
+                detail=f'{MAIN_NAME}@{main_px:.3f}'
+        elif cur=='现金':
+            if buy_ok:
+                action=f'🔴 买入红利低波'; new_pos='红利低波'
+                detail=f'全仓{MAIN_NAME}@{main_px:.3f}'
+            elif g_buy_ok:
+                action=f'🟢 买入{leader}'; new_pos=leader; new_hse=leader_px
+                detail=f'全仓{leader}@{leader_px:.3f}'
+            else:
+                action=f'⚪ 空仓等待{warn}'
+                detail='现金, 等红利买点或成长MACD'
+        else:  # 持有成长 cur
+            g_px=raw[cur]['close'].iloc[min(len(raw[cur])-1,g_idx)] if cur in raw else leader_px
+            if g_px>new_hse: new_hse=g_px
+            if buy_ok:
+                action=f'🔴 换回红利低波'; new_pos='红利低波'
+                detail=f'{cur}→{MAIN_NAME}@{main_px:.3f}'
+            elif g_px>0 and new_hse>0 and g_px<new_hse*0.9:
+                action=f'⚫ 止损现金'; new_pos='现金'; new_hse=0.0
+                detail=f'{cur} 回撤10%, 止损转现金'
+            else:
+                action=f'⚪ 持有{cur}{warn}'
+                detail=f'{cur}@{g_px:.3f}'
+
+        save_pos(new_pos,new_hse)
 
         sub_rank=f'RSI{rsi:.0f} BB{bb_pos:.0f}% | '+' > '.join(f'{n}({scores[n]:+.3f})'for n in ranking[:3])
 
@@ -174,15 +224,16 @@ def main():
         ax0.text(0,2.0,f'{detail}',fontsize=10,color='#555')
         ax0.text(0,0.8,f'副线 {sub_rank}',fontsize=10,color='#888')
 
-        if sell_ok and leader_macd>0 and leader in raw:
+        if new_pos in GROWTH and new_pos in raw:
             # 持有成长: K线+MACD
-            plot_name=leader; plot_raw=raw[leader]
+            plot_name=new_pos; plot_raw=raw[new_pos]
             ohlc=plot_raw.tail(lookback).copy()
             ohlc=ohlc.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume'})
             ohlc=ohlc.set_index('date')[['Open','High','Low','Close','Volume']]
             ax1=fig.add_subplot(gs[1])
             mpf.plot(ohlc,type='candle',ax=ax1,volume=False,style=cn_s)
-            ax1.set_title(f'{plot_name} MACD{leader_macd:+.3f}',fontsize=10,loc='left',color='#9B59B6')
+            held_macd=dfs_g[plot_name]['macd_h'].iloc[min(g_idx,len(dfs_g[plot_name])-1)] if plot_name in dfs_g else leader_macd
+            ax1.set_title(f'{plot_name} MACD{held_macd:+.3f}',fontsize=10,loc='left',color='#9B59B6')
             ax1.tick_params(labelsize=7); ax1.grid(True,alpha=0.12)
         else:
             # 持有红利低波: K线+BB
