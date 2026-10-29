@@ -1,9 +1,9 @@
 {
-  "last_date": "2026-10-28",
-  "cash": 79852.75277438387,
+  "last_date": "2026-10-29",
+  "cash": 3196023.0402344866,
   "total_injected": 2740000,
   "last_inject_month": 10,
-  "fix_pending": null,
+  "fix_pending": "2026-10-29",
   "intraday_accel": [],
   "positions": {
     "山东高速": {
@@ -31,10 +31,10 @@
       "loss_streak": 1
     },
     "江苏银行": {
-      "shares": 244887.451246021,
-      "entry": 10.56,
-      "high": 12.8,
-      "accel": true,
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
+      "accel": false,
       "cooldown": 0,
       "loss_streak": 0
     },
@@ -48,14 +48,6 @@
     }
   },
   "trades": [
-    {
-      "date": "2025-11-18",
-      "name": "渝农商行",
-      "dir": "SELL",
-      "price": 6.35,
-      "pnl": 3.2520325203251987,
-      "why": "trail"
-    },
     {
       "date": "2025-11-19",
       "name": "渝农商行",
@@ -447,6 +439,14 @@
       "price": 15.36,
       "pnl": 0,
       "why": "RSI37 评2"
+    },
+    {
+      "date": "2026-10-29",
+      "name": "江苏银行",
+      "dir": "SELL",
+      "price": 12.73,
+      "pnl": 20.54924242424243,
+      "why": "accel_tp25"
     }
   ]
 }
