@@ -3,7 +3,7 @@
   "cash": 3196023.0402344866,
   "total_injected": 2740000,
   "last_inject_month": 10,
-  "fix_pending": "2026-10-29",
+  "fix_pending": null,
   "intraday_accel": [],
   "positions": {
     "山东高速": {
