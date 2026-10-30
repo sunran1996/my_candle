@@ -1,9 +1,9 @@
 {
-  "last_date": "2026-10-27",
-  "cash": 20214785.243427657,
+  "last_date": "2026-10-30",
+  "cash": 32686869.41342766,
   "total_injected": 2640000,
   "last_inject_month": 10,
-  "fix_pending": null,
+  "fix_pending": "2026-10-30",
   "intraday_accel": [],
   "positions": {
     "长江电力": {
@@ -15,18 +15,18 @@
       "loss_streak": 0
     },
     "招商银行": {
-      "shares": 286500,
-      "entry": 34.55,
-      "high": 43.16,
-      "accel": true,
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
+      "accel": false,
       "cooldown": 0,
       "loss_streak": 0
     },
     "国电电力": {
       "shares": 3478200,
       "entry": 4.98,
-      "high": 5.21,
-      "accel": false,
+      "high": 5.43,
+      "accel": true,
       "cooldown": 0,
       "loss_streak": 0
     },
@@ -48,14 +48,6 @@
     }
   },
   "trades": [
-    {
-      "date": "2025-09-02",
-      "name": "创业板",
-      "dir": "BUY",
-      "price": 2.848,
-      "pnl": 0,
-      "why": "MACD温和(s0.5)"
-    },
     {
       "date": "2025-09-08",
       "name": "创业板",
@@ -447,6 +439,14 @@
       "price": 4.98,
       "pnl": 0,
       "why": "RSI32 评1熊 加仓(连0亏,仓位35%)"
+    },
+    {
+      "date": "2026-10-30",
+      "name": "招商银行",
+      "dir": "SELL",
+      "price": 43.55,
+      "pnl": 26.049204052098407,
+      "why": "accel_tp25"
     }
   ]
 }
