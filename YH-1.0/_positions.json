@@ -1,7 +1,7 @@
 {
-  "last_date": "2026-10-29",
+  "last_date": "2026-10-30",
   "cash": 3196023.0402344866,
-  "total_injected": 2740000,
+  "total_injected": 2760000,
   "last_inject_month": 10,
   "fix_pending": null,
   "intraday_accel": [],
@@ -17,7 +17,7 @@
     "渝农商行": {
       "shares": 431526.848632448,
       "entry": 6.11,
-      "high": 7.32,
+      "high": 7.4,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 1
