@@ -1,9 +1,9 @@
 {
-  "last_date": "2026-10-30",
-  "cash": 32686869.41342766,
-  "total_injected": 2640000,
-  "last_inject_month": 10,
-  "fix_pending": "2026-10-30",
+  "last_date": "2026-11-02",
+  "cash": 32706869.41342766,
+  "total_injected": 2660000,
+  "last_inject_month": 11,
+  "fix_pending": null,
   "intraday_accel": [],
   "positions": {
     "长江电力": {
