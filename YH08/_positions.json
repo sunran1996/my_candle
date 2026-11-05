@@ -1,9 +1,9 @@
 {
-  "last_date": "2026-11-03",
-  "cash": 32706869.41342766,
+  "last_date": "2026-11-05",
+  "cash": 14893189.941638943,
   "total_injected": 2660000,
   "last_inject_month": 11,
-  "fix_pending": null,
+  "fix_pending": "2026-11-05",
   "intraday_accel": [],
   "positions": {
     "长江电力": {
@@ -31,9 +31,9 @@
       "loss_streak": 0
     },
     "中国神华": {
-      "shares": 0,
-      "entry": 0,
-      "high": 0,
+      "shares": 372600,
+      "entry": 47.79,
+      "high": 47.79,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 0
@@ -48,14 +48,6 @@
     }
   },
   "trades": [
-    {
-      "date": "2025-09-08",
-      "name": "创业板",
-      "dir": "SELL",
-      "price": 2.908,
-      "pnl": 2.106741573033699,
-      "why": "换仓→招商银行(卖72%)"
-    },
     {
       "date": "2025-09-08",
       "name": "招商银行",
@@ -447,6 +439,14 @@
       "price": 43.55,
       "pnl": 26.049204052098407,
       "why": "accel_tp25"
+    },
+    {
+      "date": "2026-11-05",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 47.79,
+      "pnl": 0,
+      "why": "RSI43 评1牛 加仓(连0亏,仓位35%)"
     }
   ]
 }
