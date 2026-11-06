@@ -3,7 +3,7 @@
   "cash": 14893189.941638943,
   "total_injected": 2660000,
   "last_inject_month": 11,
-  "fix_pending": "2026-11-05",
+  "fix_pending": null,
   "intraday_accel": [],
   "positions": {
     "长江电力": {
@@ -33,7 +33,7 @@
     "中国神华": {
       "shares": 372600,
       "entry": 47.79,
-      "high": 47.79,
+      "high": 50.3,
       "accel": false,
       "cooldown": 0,
       "loss_streak": 0
