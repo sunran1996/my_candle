@@ -122,12 +122,21 @@ def gen_chart(raw,df_main,dfs_g,state=None):
     main_px=raw[MAIN_NAME]['close'].iloc[-1]
     bb_buy=adj<=lo; bb_sell=adj>=up; rsi_buy=rsi<=RSI_L
     buy_ok=bb_buy or rsi_buy; sell_ok=(bb_sell and rsi>=ERS)
-    main_sig='买入' if buy_ok else ('卖出' if sell_ok else '持有')
 
     # 成长MACD
     g_idx=len(dfs_g['创业板'])-1; g_row=dfs_g['创业板'].iloc[g_idx]
     macd_v=g_row['macd_h']; macd_line=g_row['macd_line']
     cy_px=raw['创业板']['close'].iloc[-1]; cy_mom=g_row['mom']
+
+    # 主线信号(标题): 红利卖出 + 创业板MACD>0 实为"换仓创业板", 不能只报"卖出", 否则标题与副线矛盾
+    if buy_ok:
+        main_sig='买入'
+    elif sell_ok and macd_v>0:
+        main_sig='换仓创业板'
+    elif sell_ok:
+        main_sig='卖出'
+    else:
+        main_sig='持有'
 
     # 预警(带建议价格)
     warn=''
