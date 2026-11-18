@@ -1,0 +1,476 @@
+{
+  "last_date": "2026-11-17",
+  "cash": 4665.845105625689,
+  "total_injected": 2640000,
+  "last_inject_month": 11,
+  "fix_pending": null,
+  "intraday_accel": [],
+  "positions": {
+    "长江电力": {
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
+      "accel": false,
+      "cooldown": 0,
+      "loss_streak": 0
+    },
+    "招商银行": {
+      "shares": 0,
+      "entry": 0,
+      "high": 0,
+      "accel": false,
+      "cooldown": 0,
+      "loss_streak": 0
+    },
+    "国电电力": {
+      "shares": 4314100,
+      "entry": 4.98,
+      "high": 5.55,
+      "accel": true,
+      "cooldown": 0,
+      "loss_streak": 0
+    },
+    "中国神华": {
+      "shares": 337100,
+      "entry": 47.79,
+      "high": 50.9,
+      "accel": true,
+      "cooldown": 0,
+      "loss_streak": 0
+    },
+    "山东高速": {
+      "shares": 1149500,
+      "entry": 10.25,
+      "high": 11.53,
+      "accel": false,
+      "cooldown": 0,
+      "loss_streak": 2
+    },
+    "渝农商行": {
+      "shares": 573100,
+      "entry": 6.11,
+      "high": 7.44,
+      "accel": true,
+      "cooldown": 0,
+      "loss_streak": 3
+    },
+    "皖通高速": {
+      "shares": 516600,
+      "entry": 15.36,
+      "high": 18.16,
+      "accel": false,
+      "cooldown": 0,
+      "loss_streak": 1
+    },
+    "江苏银行": {
+      "shares": 745900,
+      "entry": 12.0,
+      "high": 13.58,
+      "accel": false,
+      "cooldown": 0,
+      "loss_streak": 0
+    }
+  },
+  "trades": [
+    {
+      "date": "2026-02-02",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 4.42,
+      "pnl": -6.355932203389825,
+      "why": "trail"
+    },
+    {
+      "date": "2026-02-03",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 4.43,
+      "pnl": 0,
+      "why": "RSI25 评2熊 加仓(连2亏,仓位29%)"
+    },
+    {
+      "date": "2026-03-03",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 44.69,
+      "pnl": 10.53673015087806,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-03-04",
+      "name": "山东高速",
+      "dir": "SELL",
+      "price": 9.786499999999998,
+      "pnl": 14.999999999999991,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2026-03-05",
+      "name": "山东高速",
+      "dir": "BUY",
+      "price": 9.31,
+      "pnl": 0,
+      "why": "RSI41 评2熊"
+    },
+    {
+      "date": "2026-03-23",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 6.201999999999999,
+      "pnl": 39.99999999999999,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2026-03-31",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 4.7,
+      "pnl": 0,
+      "why": "RSI43 评1熊 加仓(连0亏,仓位30%)"
+    },
+    {
+      "date": "2026-03-31",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 45.6,
+      "pnl": 0,
+      "why": "RSI51 评1牛 加仓(连0亏,仓位30%)"
+    },
+    {
+      "date": "2026-04-07",
+      "name": "皖通高速",
+      "dir": "BUY",
+      "price": 13.92,
+      "pnl": 0,
+      "why": "RSI39 评1熊"
+    },
+    {
+      "date": "2026-04-14",
+      "name": "山东高速",
+      "dir": "SELL",
+      "price": 9.51,
+      "pnl": 2.1482277121374738,
+      "why": "trail"
+    },
+    {
+      "date": "2026-04-15",
+      "name": "山东高速",
+      "dir": "BUY",
+      "price": 9.73,
+      "pnl": 0,
+      "why": "RSI47 评1熊"
+    },
+    {
+      "date": "2026-05-08",
+      "name": "渝农商行",
+      "dir": "BUY",
+      "price": 7.02,
+      "pnl": 0,
+      "why": "RSI46 评1牛 加仓(连2亏,仓位0%)"
+    },
+    {
+      "date": "2026-05-13",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 43.7,
+      "pnl": -4.1666666666666625,
+      "why": "trail"
+    },
+    {
+      "date": "2026-05-22",
+      "name": "招商银行",
+      "dir": "SELL",
+      "price": 36.03,
+      "pnl": -5.3088042049934225,
+      "why": "trail"
+    },
+    {
+      "date": "2026-05-22",
+      "name": "山东高速",
+      "dir": "SELL",
+      "price": 11.78,
+      "pnl": 21.068859198355593,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-05-25",
+      "name": "招商银行",
+      "dir": "BUY",
+      "price": 35.95,
+      "pnl": 0,
+      "why": "RSI23 评2熊 加仓(连2亏,仓位18%)"
+    },
+    {
+      "date": "2026-06-03",
+      "name": "皖通高速",
+      "dir": "SELL",
+      "price": 16.704,
+      "pnl": 19.999999999999996,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2026-06-10",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 6.58,
+      "pnl": 39.99999999999999,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2026-06-10",
+      "name": "江苏银行",
+      "dir": "SELL",
+      "price": 11.49,
+      "pnl": 20.18828451882846,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-06-11",
+      "name": "山东高速",
+      "dir": "BUY",
+      "price": 10.63,
+      "pnl": 0,
+      "why": "RSI44 评2牛"
+    },
+    {
+      "date": "2026-06-15",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 42.33,
+      "pnl": 0,
+      "why": "RSI35 评1熊 加仓(连1亏,仓位30%)"
+    },
+    {
+      "date": "2026-06-18",
+      "name": "渝农商行",
+      "dir": "SELL",
+      "price": 6.26,
+      "pnl": -10.826210826210826,
+      "why": "trail"
+    },
+    {
+      "date": "2026-06-18",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 4.6,
+      "pnl": 0,
+      "why": "RSI37 评1熊 加仓(连0亏,仓位30%)"
+    },
+    {
+      "date": "2026-06-22",
+      "name": "山东高速",
+      "dir": "SELL",
+      "price": 10.07,
+      "pnl": -5.268109125117593,
+      "why": "trail"
+    },
+    {
+      "date": "2026-06-22",
+      "name": "皖通高速",
+      "dir": "BUY",
+      "price": 14.88,
+      "pnl": 0,
+      "why": "RSI42 评1熊"
+    },
+    {
+      "date": "2026-06-23",
+      "name": "山东高速",
+      "dir": "BUY",
+      "price": 10.27,
+      "pnl": 0,
+      "why": "RSI42 评2熊"
+    },
+    {
+      "date": "2026-06-25",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 38.43,
+      "pnl": -9.213323883770375,
+      "why": "trail"
+    },
+    {
+      "date": "2026-06-26",
+      "name": "招商银行",
+      "dir": "SELL",
+      "price": 50.33,
+      "pnl": 39.99999999999999,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2026-06-26",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 38.6,
+      "pnl": 0,
+      "why": "RSI27 评1熊 加仓(连2亏,仓位30%)"
+    },
+    {
+      "date": "2026-06-30",
+      "name": "招商银行",
+      "dir": "BUY",
+      "price": 34.55,
+      "pnl": 0,
+      "why": "RSI30 评1熊"
+    },
+    {
+      "date": "2026-06-30",
+      "name": "渝农商行",
+      "dir": "BUY",
+      "price": 6.11,
+      "pnl": 0,
+      "why": "RSI34 评1熊 加仓(连3亏,仓位6%)"
+    },
+    {
+      "date": "2026-07-08",
+      "name": "山东高速",
+      "dir": "SELL",
+      "price": 13.49,
+      "pnl": 31.353456669912383,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-07-15",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 43.69,
+      "pnl": 13.186528497409311,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-07-23",
+      "name": "皖通高速",
+      "dir": "SELL",
+      "price": 17.856,
+      "pnl": 19.999999999999996,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2026-07-24",
+      "name": "山东高速",
+      "dir": "BUY",
+      "price": 11.27,
+      "pnl": 0,
+      "why": "RSI46 评1熊"
+    },
+    {
+      "date": "2026-08-10",
+      "name": "山东高速",
+      "dir": "SELL",
+      "price": 10.7,
+      "pnl": -5.057675244010651,
+      "why": "trail"
+    },
+    {
+      "date": "2026-08-11",
+      "name": "山东高速",
+      "dir": "BUY",
+      "price": 10.86,
+      "pnl": 0,
+      "why": "RSI44 评2熊"
+    },
+    {
+      "date": "2026-08-21",
+      "name": "皖通高速",
+      "dir": "BUY",
+      "price": 15.5,
+      "pnl": 0,
+      "why": "RSI38 评1熊"
+    },
+    {
+      "date": "2026-09-02",
+      "name": "山东高速",
+      "dir": "SELL",
+      "price": 10.11,
+      "pnl": -6.906077348066297,
+      "why": "trail"
+    },
+    {
+      "date": "2026-09-03",
+      "name": "山东高速",
+      "dir": "BUY",
+      "price": 10.25,
+      "pnl": 0,
+      "why": "RSI40 评2熊 加仓(连2亏,仓位18%)"
+    },
+    {
+      "date": "2026-09-17",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 45.57,
+      "pnl": 0,
+      "why": "RSI49 评1牛 加仓(连0亏,仓位13%)"
+    },
+    {
+      "date": "2026-09-21",
+      "name": "皖通高速",
+      "dir": "SELL",
+      "price": 15.49,
+      "pnl": -0.0645161290322549,
+      "why": "trail"
+    },
+    {
+      "date": "2026-09-22",
+      "name": "皖通高速",
+      "dir": "BUY",
+      "price": 15.36,
+      "pnl": 0,
+      "why": "RSI37 评2熊"
+    },
+    {
+      "date": "2026-10-19",
+      "name": "中国神华",
+      "dir": "SELL",
+      "price": 50.49,
+      "pnl": 10.796576695194204,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-10-22",
+      "name": "长江电力",
+      "dir": "SELL",
+      "price": 29.82,
+      "pnl": 15.402476780185758,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-10-22",
+      "name": "国电电力",
+      "dir": "SELL",
+      "price": 6.4399999999999995,
+      "pnl": 39.99999999999999,
+      "why": "accel_floor"
+    },
+    {
+      "date": "2026-10-23",
+      "name": "国电电力",
+      "dir": "BUY",
+      "price": 4.98,
+      "pnl": 0,
+      "why": "RSI32 评1熊 加仓(连0亏,仓位30%)"
+    },
+    {
+      "date": "2026-10-23",
+      "name": "江苏银行",
+      "dir": "BUY",
+      "price": 12.0,
+      "pnl": 0,
+      "why": "RSI43 评1熊"
+    },
+    {
+      "date": "2026-10-30",
+      "name": "招商银行",
+      "dir": "SELL",
+      "price": 43.55,
+      "pnl": 26.049204052098407,
+      "why": "accel_tp25"
+    },
+    {
+      "date": "2026-11-05",
+      "name": "中国神华",
+      "dir": "BUY",
+      "price": 47.79,
+      "pnl": 0,
+      "why": "RSI43 评1牛 加仓(连0亏,仓位22%)"
+    }
+  ]
+}
