@@ -23,9 +23,9 @@ CORE_STOCKS = {'长江电力': 'sh600900', '招商银行': 'sh600036', '国电�
                '山东高速': 'sh600350', '渝农商行': 'sh601077', '皖通高速': 'sh600012', '江苏银行': 'sh600919'}
 ALL_STOCKS = dict(CORE_STOCKS)
 
-INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.125   # 每只票等权 1/8
-# 每只核心股默认仓位上限: 等权 1/8 (连亏时小幅加仓, 见 MAX_POS_BOOST/DOUBLE)
-BASE_POS = {}
+INIT = 1_000_000; COMM = 0.0003; SLIP = 0.0001; MAX_POS = 0.125   # 其余票等权 1/8
+# 每只核心股默认仓位上限: 赢家(国电/神华)保留倾斜30%, 其余等权1/8 (连亏时小幅加仓)
+BASE_POS = {'国电电力': 0.30, '中国神华': 0.30}
 BARK_ENABLED = True   # 实盘推送开启
 BARK_KEYS = ['eoq8G58fJtDDFxHjhNueGH']  # 仅推送给第一个用户
 REPO = 'sunran1996/my_candle'
@@ -65,8 +65,8 @@ BUY_PARAMS = {
 TRAIL_STOP     = 0.08       # 移动止损8% (2026-09 牛熊扫描重调)
 HARD_STOP      = 0.12       # 硬止损12%
 COOLDOWN       = 40         # 硬止损后冷却天数
-MAX_POS_BOOST  = 0.15       # 连亏≥2 + 有其他持仓 → 小幅加仓到15%
-MAX_POS_DOUBLE = 0.20       # 连亏≥4 + 有其他持仓 → 加仓到20%
+MAX_POS_BOOST  = 0.18       # 连亏≥2 + 有其他持仓 → 温和加仓到18%
+MAX_POS_DOUBLE = 0.25       # 连亏≥4 + 有其他持仓 → 加仓到25%
 LOSS_STREAK_N  = 2          # 连续止损N次触发加仓
 MONTHLY_INJECT = 20000      # 每月定投2w
 BACKTEST_START = '2020-01-01'   # 全量回测起点(重建state时生效)
