@@ -1,7 +1,7 @@
 {
-  "last_date": "2026-11-12",
-  "cash": 14893189.941638943,
-  "total_injected": 2660000,
+  "last_date": "2026-11-17",
+  "cash": 14893051.146668788,
+  "total_injected": 2640000,
   "last_inject_month": 11,
   "fix_pending": null,
   "intraday_accel": [],
@@ -23,9 +23,9 @@
       "loss_streak": 0
     },
     "国电电力": {
-      "shares": 3478200,
+      "shares": 3478100,
       "entry": 4.98,
-      "high": 5.45,
+      "high": 5.55,
       "accel": true,
       "cooldown": 0,
       "loss_streak": 0
@@ -33,8 +33,8 @@
     "中国神华": {
       "shares": 372600,
       "entry": 47.79,
-      "high": 50.3,
-      "accel": false,
+      "high": 50.9,
+      "accel": true,
       "cooldown": 0,
       "loss_streak": 0
     },
@@ -396,7 +396,7 @@
       "date": "2026-09-17",
       "name": "中国神华",
       "dir": "BUY",
-      "price": 46.48,
+      "price": 45.57,
       "pnl": 0,
       "why": "RSI49 评1牛 加仓(连0亏,仓位32%)"
     },
@@ -404,8 +404,8 @@
       "date": "2026-10-19",
       "name": "中国神华",
       "dir": "SELL",
-      "price": 51.5,
-      "pnl": 10.800344234079184,
+      "price": 50.49,
+      "pnl": 10.796576695194204,
       "why": "accel_tp25"
     },
     {
