@@ -564,17 +564,24 @@ def print_ledger(td, title):
 
 
 def export_ledger_csv(td, path):
-    """导出交易明细为CSV(UTF-8-BOM, Excel可直接打开)"""
+    """导出交易明细为CSV(UTF-8-BOM, Excel可直接打开); 卖出行附持仓天数(建仓→卖出的自然日)."""
     rows = []
+    entry_date = {}   # 标的 -> 最近一次建仓日期 (每次买入覆盖; 卖出行据此算持仓天数)
     for _, t in td.sort_values('date', kind='stable').iterrows():
+        n = t['name']
         if t['dir'] == 'BUY':
-            rows.append({'日期': t['date'].strftime('%Y-%m-%d'), '标的': t['name'], '操作': '买入',
+            entry_date[n] = t['date']
+            rows.append({'日期': t['date'].strftime('%Y-%m-%d'), '标的': n, '操作': '买入',
+                         '持仓天数': '',
                          '成本价': round(float(t['price']), 4), '卖出价': '',
                          '股数': int(round(float(t['qty']))),
                          '盈亏金额(元)': '', '盈亏(%)': '', '说明': t['reason'],
                          '总市值(元)': round(float(t['nav']), 2)})
         else:
-            rows.append({'日期': t['date'].strftime('%Y-%m-%d'), '标的': t['name'], '操作': '卖出',
+            d0 = entry_date.get(n)
+            days = (t['date'].date() - d0.date()).days if d0 is not None else ''
+            rows.append({'日期': t['date'].strftime('%Y-%m-%d'), '标的': n, '操作': '卖出',
+                         '持仓天数': days,
                          '成本价': round(float(t['entry_px']), 4), '卖出价': round(float(t['price']), 4),
                          '股数': int(round(float(t['qty']))),
                          '盈亏金额(元)': round(float(t['pnl_dollar']), 2),
